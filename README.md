@@ -1,67 +1,100 @@
-# Retail Price Optimization - Help them to sell more
+# Retail Price Optimization — SCAFLF Fruits & Legumes
 
-In today's competitive retail market, setting the right price for products is crucial. This project focuses on retail price optimization using machine learning techniques to predict customer satisfaction scores. This is a crucial part of developing dynamic pricing strategies, leading to increased sales and customer satisfaction.
+Optimisation des prix de vente consommateur (PVC) pour les Fruits & Legumes
+de la SCAFLF (ITM / INTERMARCHE + NETTO), 19 bases logistiques.
 
-**Problem statement:** Our task is to develop a model that predicts the optimal price for a product based on various factors. This prediction would enable us to make an informed decision when pricing a product, leading to maximized sales and customer satisfaction.
-
-The dataset's diverse features like product details, order details, review details, pricing, competition, time, and customer details provide a comprehensive view for our price optimization task.
-
-By analyzing this information, we aim to predict the optimal price for retail products. This would aid in making strategic pricing decisions, thereby optimizing retail prices effectively.
-
-The sample dataset includes various details about each order, such as:
-
-- Product details: ID, category, weight, dimensions, and more.
-- Order details: Approved date, delivery date, estimated delivery date, and more.
-- Review details: Score and comments.
-- Pricing and competition details: Total price, freight price, unit price, competitor prices, and more.
-- Time details: Month, year, weekdays, weekends, holidays.
-- Customer details: ZIP code, order item ID.
-
-## 🐍 Python Requirements
-
-Let's jump into the Python packages you need. Within the Python environment of your choice, run:
-
-```python
-git clone https://github.com/ayush714/retail-price-optimization-mlops.git
-pip install -r requirements.txt
-```
-
-Starting with ZenML 0.20.0, ZenML comes bundled with a React-based dashboard. This dashboard allows you to observe your stacks, stack components and pipeline DAGs in a dashboard interface. To access this, you need to launch the ZenML Server and Dashboard locally, but first you must install the optional dependencies for the ZenML server:
-
-```python
-pip install zenml["server"]
-zenml up
-```
-
-If you are running the `run_cid_pipeline.p`y` script, you will also need to install some integrations using ZenML:
+## Architecture
 
 ```
-zenml integration install mlflow -y
-zenml integration install bentoml
+retail-price-optimization-mlops/
+├── config/
+│   └── business_rules.yaml       # Regles metier (modifiable sans code)
+├── src/
+│   ├── config.py                  # Loader YAML → constantes Python
+│   ├── features/                  # Chargement donnees, indices, POLCO, meteo
+│   ├── forecast/                  # LightGBM : train, predict, evaluate
+│   ├── perequation/               # Equilibrage marge SUIVI / NON SUIVI
+│   ├── optimization/              # Monte Carlo : simulator, scorer, optimizer
+│   ├── output/                    # Writer tables Databricks (Delta)
+│   └── pipeline/                  # Orchestrateur principal
+├── tests/                         # Tests unitaires (pytest)
+├── notebooks/                     # Analyses exploratoires
+└── pyproject.toml                 # Dependencies & config projet
 ```
 
-The project can only be executed with a ZenML stack that has an MLflow experiment tracker and BentoML model deployer as a component. Configuring a new stack with the two components are as follows:
+## Pipeline Pricing
+
+Flux complet bi-hebdomadaire (vendredi + mardi) :
 
 ```
-zenml experiment-tracker register mlflow_tracker --flavor=mlflow
-zenml model-deployer register bentoml_deployer --flavor=bentoml
-zenml stack register local_bentoml_stack \
-  -a default \
-  -o default \
-  -d bentoml_deployer \
-  -e mlflow_tracker
-  --set
+1. FORECAST         LightGBM V2 → predictions Qte/CA par produit x base
+                    |
+2. SEPARATION       SUIVI (optimise) / NON SUIVI (passthrough) / POLCO (impose)
+                    |
+3. PEREQUATION      Calcul MLNI NS requis → cible pour le Monte Carlo
+                    |                        (se calcule AVANT le MC)
+4. MONTE CARLO      Boucle iterative par enseigne :
+   ITERATIF           a. Generer 10K scenarios (PVC, PC) sur paliers FL (X.X9)
+                      b. Scorer : marge 50% + indice 35% + lissage 15%
+                      c. Verification portfolio (indice CA + MLNI global)
+                      d. Si non convergent → re-iterer (max 5 iterations)
+                    |
+5. SORTIE           Tables Databricks en append (partitionne par run_id)
 ```
 
-## 🚀 Training Pipeline
+## Regles metier cles
 
-Our standard training pipeline consists of several steps:
+| Regle | Valeur |
+|-------|--------|
+| INTERMARCHE MLNI cible | 34.75% |
+| INTERMARCHE indice cible (vs E.Leclerc) | 102 |
+| NETTO MLNI cible | 29.25% |
+| NETTO indice cible (vs Lidl) | 100 |
+| TVA F&L | 5.5% |
+| Monte Carlo scenarios | 10 000 / produit x base |
+| Paliers PVC | X.X9 (pas 0.10) |
+| Scheduling | Vendredi (J+7) + Mardi (J+4) |
 
-- `ingest`: Ingests the data from the databas into the ZenML repository.
-- `categorical_encoder`: Encodes the categorical features of the dataset.
-- `feature_engineer`: Create new features from the existing features.
-- `split`: Splits the dataset into train and eval splits.
-- `train`: Trains the model on the training split.
-- `evaluate`: Evaluates the model on the eval split.
-- `decision`:
-- `deploy`: Deploys the model to a BentoML endpoint.
+## Installation
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Tests
+
+```bash
+pytest tests/ -v
+```
+
+## Execution
+
+```bash
+# Run vendredi (complet)
+python -m src.pipeline.run_pricing friday complet
+
+# Run mardi (reajustement)
+python -m src.pipeline.run_pricing tuesday complet
+
+# Simulation (dry run, pas d'ecriture prod)
+python -m src.pipeline.run_pricing friday simulation
+```
+
+## Configuration
+
+Toutes les regles metier sont dans `config/business_rules.yaml`.
+Modifiable sans toucher au code. Les 13 sections couvrent :
+
+1. **Taxonomie produits** : SUIVI / NON SUIVI / POLCO
+2. **Enseignes & objectifs** : MLNI, indices par enseigne
+3. **Formules financieres** : 3 marges SCAFLF (MADH, MFIL, MLNI)
+4. **Perequation** : equilibrage SUIVI/NS, granularite DAX
+5. **Monte Carlo** : scenarios, scoring, convergence
+6. **Contraintes prix** : bornes, arrondis FL, stabilite
+7. **Previsions** : parametres LightGBM, mix volume
+8. **Bases logistiques** : 19 bases avec coordonnees GPS
+9. **Sortie Databricks** : 6 tables Delta en append
+10. **Scheduling** : vendredi/mardi
+11. **Modes** : complet / simulation / suivis_only
+12. **Meteo** : API Open-Meteo
+13. **Parametres techniques** : logging, run_id
