@@ -1,248 +1,442 @@
 # =============================================================================
-# REGLES METIER — Pricing Retail
+# REGLES METIER — Pricing Retail SCAFLF Fruits & Legumes
 # =============================================================================
-# Ce fichier centralise TOUTES les règles métier pilotables par le métier.
-# Aucune modification de code n'est nécessaire pour ajuster ces paramètres.
+# Ce fichier centralise TOUTES les regles metier pilotables par le metier.
+# Aucune modification de code n'est necessaire pour ajuster ces parametres.
 # Historique des modifications : utiliser git blame sur ce fichier.
+#
+# REFERENCE : repo pricing-algo (genese) — src/config.py
 # =============================================================================
 
 
 # -----------------------------------------------------------------------------
 # 1. TAXONOMIE PRODUITS
 # -----------------------------------------------------------------------------
+# TROIS populations distinctes :
+#   - SUIVI     : assortiment de base, optimise par le modele Monte Carlo
+#   - NON SUIVI : operations promotionnelles, levier de perequation, JAMAIS touche
+#   - POLCO     : prix contraints nationaux (INTERMARCHE only), JAMAIS touche
+#
 produits:
-  # Produits suivis : optimisés par le modèle (c'est eux qu'on travaille)
   suivis:
-    source: "referentiel_produits"          # table Databricks source
-    filtre_colonne: "flag_suivi"            # colonne booléenne dans le référentiel
-    politique_prix: "optimisation"          # prix optimisé par le modèle
-    # Décomposition de marge globale sur les suivis
-    decomposition_marge:
-      actif: true
-      source_ventes_futures: "previsions_volume_ca"   # table des prévisions
-      methode: "prorata_ca_previsionnel"               # clé de répartition
+    description: >
+      Assortiment de base stable. C'est eux qu'on optimise.
+      Le modele Monte Carlo genere des scenarios (PVC, PC) pour chaque
+      produit x base et selectionne le meilleur via scoring multi-criteres.
+    source: "referentiel_produits"
+    filtre_colonne: "Maille_Suivi"
+    valeur_filtre: "SUIVI"
+    politique_prix: "optimisation"
 
-  # Produits non suivis (POLCO) : prix imposés, le modèle ne les touche pas
   non_suivis:
-    politique_prix: "passthrough"           # prix imposé — transmis tel quel
+    description: >
+      Operations promotionnelles. Leur marge est un levier d'ajustement
+      pour atteindre l'objectif MLNI global (perequation).
+      Le modele ne touche JAMAIS leurs prix.
+    filtre_colonne: "Maille_Suivi"
+    valeur_filtre: "NON SUIVI"
+    politique_prix: "passthrough"
+
+  polco:
+    description: >
+      Prix contraints nationaux (fichiers PRICING_FFL_*.csv).
+      INTERMARCHE uniquement. PVC impose, exclu de l'optimisation.
+      Reporte a part dans les sorties.
+    enseigne: "INTERMARCHE"
+    source_fichiers: "PRICING_FFL_*.csv"
+    format:
+      separateur: ";"
+      encoding: "windows-1252"
+      colonnes: ["Type", "Enseigne", "Code_CPS", "Zone", "Prix_brut"]
+    politique_prix: "impose"
 
 
 # -----------------------------------------------------------------------------
-# 2. PEREQUATION
+# 2. ENSEIGNES & OBJECTIFS
+# -----------------------------------------------------------------------------
+enseignes:
+  INTERMARCHE:
+    MLNI_TAUX: 34.75                          # Objectif MLNI global (%)
+    MADH_TAUX_MIN: 0.0                        # Marge adherent >= 0
+    MFIL_TAUX_MIN: 0.0                        # Marge filiere >= 0
+    concurrent_reference: "E.Leclerc"
+    colonne_prix_concurrent: "Prix_Moyen_LCL"
+    INDICE_CIBLE: 102.0                       # ITM vs E.Leclerc (base 100)
+
+  NETTO:
+    MLNI_TAUX: 29.25                          # Objectif MLNI global (%)
+    MADH_TAUX_MIN: 0.0
+    MFIL_TAUX_MIN: 0.0
+    concurrent_reference: "Lidl"
+    colonne_prix_concurrent: "Prix_Moyen_LIDL"
+    INDICE_CIBLE: 100.0                       # Netto vs Lidl (parite)
+
+
+# -----------------------------------------------------------------------------
+# 3. FORMULES FINANCIERES
+# -----------------------------------------------------------------------------
+# CRITIQUES — ne pas modifier sans validation metier + recette complete
+#
+formules:
+  tva_default_pct: 5.5                        # TVA Fruits & Legumes
+
+  # Les 3 marges du modele SCAFLF :
+  #   CA_TTC     = PVC                             (prix TTC consommateur)
+  #   CA_HT      = PVC / (1 + TVA/100)
+  #   MADH_Val   = CA_HT - PC                      (marge adherent)
+  #   MFIL_Val   = PC - PA                          (marge filiere)
+  #   MLNI_Val   = CA_HT - PA                       (marge ligne nette ITM)
+  #
+  # Taux :
+  #   MADH_Taux  = MADH_Val / CA_TTC * 100          (denom CA TTC, pas CA HT !)
+  #   MFIL_Taux  = MFIL_Val / Val_Cession * 100     (denom = PC)
+  #   MLNI_Taux  = MLNI_Val / CA_TTC * 100           (denom CA TTC)
+  #
+  # Indice prix :
+  #   Indice     = (PVC / Prix_Concurrent) * 100
+
+  # Seuils d'alerte
+  marge_aberrante_min_pct: -5.0               # marge < -5% = anomalie
+  marge_aberrante_max_pct: 60.0               # marge > 60% = anomalie
+
+  # Filiere exclue des indices prix
+  filiere_horticole_code: 42
+
+
+# -----------------------------------------------------------------------------
+# 4. PEREQUATION SUIVI / NON SUIVI
 # -----------------------------------------------------------------------------
 perequation:
   actif: true
   description: >
-    Mécanisme d'équilibrage de marge entre bases et enseignes.
-    Objectif : lisser les écarts de rentabilité tout en respectant
-    les contraintes concurrentielles locales.
+    Mecanisme d'equilibrage : la marge totale (MLNI) est le mix entre
+    SUIVI (base stable) et NON SUIVI (operations promo, levier d'ajustement).
+      MLNI_total = (CA_suivi * MLNI_suivi + CA_ns * MLNI_ns) / CA_total
+    Ce module calcule la marge NS requise pour atteindre l'objectif global,
+    et derive les prix minimaux (PVC, PC) compatibles.
 
-  # Granularité d'affichage (doit être compatible DAX / Power BI)
+  # Granularite d'affichage (compatible DAX / Power BI)
   granularite:
     dimensions:
-      - base
-      - enseigne
-      - semaine               # ISO week — clé temporelle pour DAX
+      - Semaine_FFL                           # semaine FFL (ISO week)
+      - CODBAS                                # base logistique
+      - Enseigne                              # INTERMARCHE | NETTO
     table_databricks: "perequation_details"
 
-  # Paramètres de calcul
-  calcul:
-    cible_marge_globale_pct: null           # null = calculé dynamiquement par run
-    tolerance_ecart_base_pct: 2.0           # écart max toléré entre bases (%)
-    tolerance_ecart_enseigne_pct: 1.5       # écart max toléré entre enseignes (%)
-    ponderation: "volume_ca_previsionnel"   # pondération par volume CA prévisionnel
+  # Colonnes de la matrice de perequation
+  colonnes_matrice:
+    group_keys:
+      - Semaine_FFL
+      - Annee_FFL
+      - Num_Semaine
+      - CODBAS
+      - Nom_Base
+      - Enseigne
+    value_cols:
+      - CA_TTC
+      - CA_HT
+      - Val_Cession
+      - Val_Achat
+      - MLNI_Val
+      - MADH_Val
+      - MFIL_Val
+      - Qte_Reelle
+    pivot_col: "Maille_Suivi"                 # SUIVI | NON SUIVI
+    suffixes: ["_SUIVI", "_NS", "_TOTAL"]
 
-  # Contraintes
-  contraintes:
-    respecter_prix_plancher: true
-    respecter_prix_plafond: true
-    priorite_sur_marge_cible: false         # si conflit, la péréquation cède
+  # Indicateurs derives
+  indicateurs:
+    - Part_NS_Pct                             # poids du NS dans le CA total
+    - MLNI_NS_Requis                          # marge NS requise pour l'objectif
+    - Ecart_MLNI_Total                        # ecart vs objectif
+    - Sensibilite_1pt_NS                      # impact de +1pt NS sur le total
+    - NS_Requis_Realiste                      # flag faisabilite
+
+  # Lecture chunked (gros volumes)
+  chunksize: 500000
 
 
 # -----------------------------------------------------------------------------
-# 3. PREVISIONS VOLUME / CA
+# 5. MONTE CARLO — Optimisation des prix
+# -----------------------------------------------------------------------------
+monte_carlo:
+  n_scenarios: 10000                          # tirages par produit x base
+  pvc_variation_pct: 15.0                     # amplitude max autour du PVC actuel
+  seed: 42                                    # reproductibilite
+
+  # Scoring multi-criteres (somme ponderee, 0 a 1)
+  scoring:
+    poids:
+      marge: 0.50                             # maximisation marge MLNI
+      indice: 0.35                            # proximite a l'indice cible
+      lissage: 0.15                           # penalite saut prix J→J+1
+
+    # Score marge : echelle lineaire 0%→0, scale_max%→1
+    marge_scale_max_pct: 50.0
+
+    # Score indice : zone optimale ±2 pts, penalite au-dela
+    indice_zone_optimale_pts: 2.0
+    indice_penalite_au_dessus: 10.0           # -1 score sur 10 pts d'ecart
+    indice_penalite_en_dessous: 20.0          # penalite legere si trop bas
+
+    # Score lissage : seuil de penalite
+    lissage_seuil_pct: 5.0                    # penalite si variation > 5% vs J-1
+
+  # MLNI = resultat PORTEFEUILLE (perequation SUIVI+NS).
+  # Le scorer maximise la marge sans cibler un taux MLNI par produit.
+  mlni_floor_pct: 15.0                        # plancher pour bornes PVC du simulateur
+
+  # Front de Pareto 2D (marge vs ecart a l'indice cible)
+  pareto: true
+
+
+# -----------------------------------------------------------------------------
+# 6. CONTRAINTES DE PRIX
+# -----------------------------------------------------------------------------
+contraintes_prix:
+  # Prix plancher (PVC_min) : derive de la marge MLNI cible
+  # PVC_min = PA / (1/coef_tva - mlni_cible/100)
+  prix_plancher:
+    actif: true
+    methode: "mlni_cible"                     # derive des objectifs par enseigne
+
+  # Prix plafond (PVC_max) : indice vs concurrent
+  # PVC_max = Prix_Concurrent * Indice_Cible / 100
+  prix_plafond:
+    actif: true
+    methode: "indice_concurrent"
+
+  # Bornes PC (prix de cession)
+  # PC_min = PA           → MFIL >= 0 (filiere ne perd pas)
+  # PC_max = CA_HT        → MADH >= 0 (adherent ne perd pas)
+  bornes_pc:
+    MFIL_min: 0.0                             # PC >= PA
+    MADH_min: 0.0                             # PC <= CA_HT
+
+  # Arrondi FL — paliers Fruits & Legumes
+  arrondis:
+    actif: true
+    methode: "paliers_fl"                     # paliers X.X9 (0.99, 1.29, 1.49...)
+    pas: 0.10                                 # grille de 10 centimes
+    suffixe: 9                                # tous les PVC finissent en X.X9
+    # 91% des PVC FL finissent en X.X9 (observation metier)
+    # Pas de regle sur les prix de cession (PC)
+
+  # Anti-volatilite (lissage inter-runs)
+  stabilite:
+    actif: true
+    ecart_max_pct: 5.0                        # variation max entre 2 runs consecutifs
+
+
+# -----------------------------------------------------------------------------
+# 7. PREVISIONS VOLUME / CA
 # -----------------------------------------------------------------------------
 previsions:
   description: >
-    Données de prévision de volume et CA fournies en amont.
-    Nécessaires à la péréquation et au mix volume potentiel.
+    Donnees de prevision de volume et CA, necessaires a la perequation
+    et au mix volume potentiel.
+
+  # Forecast V2 — grain produit (LightGBM)
+  forecast:
+    modele: "LightGBM"
+    target: "Qte_Reelle"
+    historique_min_jours: 14                  # par produit
+    historique_min_semaines: 30               # pour entrainement global
+    horizon_jours: 14
+    parametres_lgbm:
+      n_estimators: 1000
+      max_depth: 8
+      learning_rate: 0.03
+      num_leaves: 127
+      subsample: 0.8
+      colsample_bytree: 0.8
+      min_child_samples: 20
+      reg_alpha: 0.1
+      reg_lambda: 1.0
+    early_stopping_rounds: 50
 
   source:
     table_databricks: "previsions_volume_ca"
     colonnes_requises:
-      - code_produit
-      - base
-      - enseigne
-      - semaine_iso
-      - volume_prevu
-      - ca_prevu
+      - CODE_PRODUIT_STANDARD
+      - CODBAS
+      - Enseigne
+      - Semaine_FFL
+      - Qte_Pred
+      - CA_Pred
 
   # Mix volume potentiel
   mix_volume:
     actif: true
-    methode: "contribution_marginale"       # poids de chaque produit dans le mix
-    horizon_semaines: 4                     # horizon glissant de calcul
+    methode: "contribution_marginale"
+    horizon_semaines: 4
 
 
 # -----------------------------------------------------------------------------
-# 4. CONTRAINTES DE PRIX
+# 8. BASES LOGISTIQUES
 # -----------------------------------------------------------------------------
-contraintes_prix:
-  # Prix plancher (floor)
-  prix_plancher:
-    actif: true
-    methode: "cout_revient_majore"
-    majoration_pct: 1.0                     # marge mini 1% au-dessus du coût de revient
-
-  # Prix plafond (ceiling)
-  prix_plafond:
-    actif: true
-    methode: "indice_concurrentiel"
-    indice_max: 105                         # indice prix max vs concurrence (base 100)
-
-  # Arrondis
-  arrondis:
-    actif: true
-    methode: "prix_psychologique"           # arrondi au x.x9 / x.x5
-    pas: 0.05                              # pas d'arrondi minimum
-    suffixes_autorises: [5, 9]             # centimes autorisés en suffixe
-
-  # Écart max entre deux runs (anti-volatilité)
-  stabilite:
-    actif: true
-    ecart_max_pct: 5.0                      # variation max entre 2 runs consécutifs
-    ecart_max_absolu: 0.50                  # variation max en € entre 2 runs
+bases:
+  "8":   { nom: "ANGOULEME",          ville: "Angouleme",           lat: 45.65, lon: 0.16 }
+  "10":  { nom: "BEZIERS",            ville: "Beziers",             lat: 43.34, lon: 3.22 }
+  "14":  { nom: "DOLE",               ville: "Dole",                lat: 47.09, lon: 5.49 }
+  "20":  { nom: "AVION",              ville: "Avion",               lat: 50.41, lon: 2.83 }
+  "26":  { nom: "LYON",               ville: "St-Quentin-Fallavier", lat: 45.63, lon: 5.10 }
+  "28":  { nom: "NEULLIAC",           ville: "Neulliac",            lat: 48.13, lon: -3.02 }
+  "35":  { nom: "DONZERE",            ville: "Donzere",             lat: 44.44, lon: 4.71 }
+  "48":  { nom: "MONTBARTIER",        ville: "Montbartier",         lat: 44.00, lon: 1.27 }
+  "55":  { nom: "AMILLY",             ville: "Amilly",              lat: 47.97, lon: 2.77 }
+  "59":  { nom: "CANLY",              ville: "Canly",               lat: 49.37, lon: 2.52 }
+  "65":  { nom: "MONTELIMAR",         ville: "Montelimar",          lat: 44.56, lon: 4.75 }
+  "66":  { nom: "LUXEMONT",           ville: "Luxemont-et-Villotte", lat: 48.70, lon: 5.20 }
+  "68":  { nom: "CASTETS",            ville: "Castets",             lat: 43.88, lon: -1.15 }
+  "72":  { nom: "BRIGNOLES",          ville: "Brignoles",           lat: 43.41, lon: 6.06 }
+  "78":  { nom: "LOUVIERS",           ville: "Louviers",            lat: 49.22, lon: 1.17 }
+  "82":  { nom: "PARIS/MELUN-SENART", ville: "Melun",               lat: 48.54, lon: 2.66 }
+  "85":  { nom: "HEUDEBOUVILLE",      ville: "Heudebouville",       lat: 49.16, lon: 1.20 }
+  "88":  { nom: "BOURGES",            ville: "Bourges",             lat: 47.08, lon: 2.40 }
+  "97":  { nom: "ERBREE",             ville: "Erbree",              lat: 48.10, lon: -1.20 }
 
 
 # -----------------------------------------------------------------------------
-# 5. MARGES & OBJECTIFS
-# -----------------------------------------------------------------------------
-marges:
-  # Objectif de marge globale (tous produits confondus)
-  objectif_global:
-    taux_marge_cible_pct: null              # null = défini par run / scénario
-    mode: "taux_marge_brute"                # taux_marge_brute | taux_marge_nette
-
-  # Décomposition par axe
-  decomposition:
-    axes:
-      - base
-      - enseigne
-      - famille_produit
-    methode: "top_down"                     # top_down | bottom_up
-    source_poids: "ca_previsionnel"         # clé de ventilation
-
-
-# -----------------------------------------------------------------------------
-# 6. SORTIE DATABRICKS
+# 9. SORTIE DATABRICKS
 # -----------------------------------------------------------------------------
 sortie:
-  format: "databricks_table"                # PAS de CSV — tables en dur
+  format: "databricks_table"                  # PAS de CSV — tables en dur
 
   tables:
-    # Table principale des recommandations
     recommandations:
       nom: "reco_pricing"
       schema: "pricing"
-      mode_ecriture: "append"               # append = archivage par run
-      colonnes_partition:
-        - run_id
-        - date_run
-        - mode
-      colonnes_cles:
-        - code_produit
-        - base
-        - enseigne
-        - semaine_iso
+      mode_ecriture: "append"
+      colonnes_partition: [run_id, date_run, mode]
+      colonnes_cles: [CODE_PRODUIT, CODBAS, Enseigne, Semaine_FFL]
+      colonnes_sortie:
+        - CODE_PRODUIT
+        - CODBAS
+        - Nom_Base
+        - Enseigne
+        - PA
+        - PVC_Current
+        - PVC_Optimal
+        - PC_Optimal
+        - Delta_PVC
+        - Delta_PVC_Pct
+        - MLNI_Prevu
+        - MADH_Prevu
+        - MFIL_Prevu
+        - Indice_Prevu
+        - Score
+        - Is_Feasible
+        - N_Feasible
 
-    # Table péréquation (détail pour DAX)
+    polco:
+      nom: "polco_pricing"
+      schema: "pricing"
+      mode_ecriture: "append"
+      colonnes_partition: [run_id, date_run]
+      colonnes_cles: [CODE_PRODUIT_STANDARD, CODBAS, Enseigne, Semaine_FFL]
+
     perequation:
       nom: "perequation_details"
       schema: "pricing"
       mode_ecriture: "append"
-      colonnes_partition:
-        - run_id
-        - date_run
-      colonnes_cles:
-        - base
-        - enseigne
-        - semaine_iso
+      colonnes_partition: [run_id, date_run]
+      colonnes_cles: [CODBAS, Enseigne, Semaine_FFL]
 
-    # Table synthèse
     synthese:
       nom: "synthese_pricing"
       schema: "pricing"
       mode_ecriture: "append"
-      colonnes_partition:
-        - run_id
-        - date_run
-        - mode
+      colonnes_partition: [run_id, date_run, mode]
 
-    # Table décomposition de marge (suivis — produits optimisés)
     decomposition_marge:
       nom: "decomposition_marge_suivis"
       schema: "pricing"
       mode_ecriture: "append"
-      colonnes_partition:
-        - run_id
-        - date_run
-      colonnes_cles:
-        - code_produit
-        - base
-        - enseigne
-        - semaine_iso
+      colonnes_partition: [run_id, date_run]
+      colonnes_cles: [CODE_PRODUIT, CODBAS, Enseigne, Semaine_FFL]
 
-  # Archivage
+    portfolio_metrics:
+      nom: "portfolio_metrics"
+      schema: "pricing"
+      description: >
+        Metriques agregees par enseigne : indice CA comparable,
+        MLNI portefeuille, nb produits, delta PVC moyen.
+      mode_ecriture: "append"
+      colonnes_partition: [run_id, date_run]
+
   archivage:
     actif: true
-    retention_runs: 52                      # garder 52 derniers runs (1 an hebdo)
+    retention_runs: 52                        # 1 an hebdo
     compression: "snappy"
 
 
 # -----------------------------------------------------------------------------
-# 7. MODES D'EXECUTION
+# 10. SCHEDULING — Pipeline bi-hebdomadaire
+# -----------------------------------------------------------------------------
+scheduling:
+  friday:
+    description: "Run principal — indices frais du jeudi"
+    forecast_horizon_jours: 7                 # jusqu'au jeudi suivant
+
+  tuesday:
+    description: "Reajustement — actuals du weekend + lundi"
+    forecast_horizon_jours: 4                 # jusqu'au vendredi
+
+
+# -----------------------------------------------------------------------------
+# 11. MODES D'EXECUTION
 # -----------------------------------------------------------------------------
 modes:
-  # Mode normal : pricing complet
   complet:
     description: "Run complet — tous produits, toutes bases, toutes enseignes"
     inclure_suivis: true
-    inclure_non_suivis: true
+    inclure_polco: true                       # reporte a part, pas optimise
     perequation: true
     decomposition_marge: true
 
-  # Mode simulation : pas d'écriture définitive
   simulation:
-    description: "Dry run — calcul sans écriture en table de prod"
+    description: "Dry run — calcul sans ecriture en table de prod"
     schema_sortie: "pricing_sandbox"
     inclure_suivis: true
-    inclure_non_suivis: true
+    inclure_polco: true
     perequation: true
     decomposition_marge: true
 
-  # Mode suivis uniquement (optimisation seule, sans les POLCO)
   suivis_only:
-    description: "Optimisation des suivis uniquement"
+    description: "Optimisation des suivis uniquement (sans POLCO report)"
     inclure_suivis: true
-    inclure_non_suivis: false
+    inclure_polco: false
     perequation: true
     decomposition_marge: true
 
 
 # -----------------------------------------------------------------------------
-# 8. PARAMETRES TECHNIQUES
+# 12. METEO (features forecast)
+# -----------------------------------------------------------------------------
+meteo:
+  api_url: "https://api.open-meteo.com/v1/forecast"
+  variables:
+    - temperature_2m_max
+    - temperature_2m_min
+    - precipitation_sum
+    - sunshine_duration
+    - uv_index_max
+
+
+# -----------------------------------------------------------------------------
+# 13. PARAMETRES TECHNIQUES
 # -----------------------------------------------------------------------------
 technique:
-  # Logging
   log_level: "INFO"
 
-  # Gestion des runs
   run:
     id_format: "PRICING_{mode}_{YYYYMMDD}_{HHmmss}"
     metadata:
       - utilisateur
       - mode
       - date_run
-      - version_config                      # hash du présent fichier
+      - version_config
       - nombre_produits_traites
       - marge_globale_obtenue
+      - portfolio_metrics
