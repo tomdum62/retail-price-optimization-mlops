@@ -70,6 +70,8 @@ ENSEIGNES: Dict[str, Dict[str, Any]] = _RAW["enseignes"]
 OBJECTIFS: Dict[str, Dict[str, Any]] = {
     enseigne: {
         "MLNI_TAUX": params["MLNI_TAUX"],
+        "MADH_TAUX_CIBLE": params.get("MADH_TAUX_CIBLE", 0.0),
+        "MFIL_TAUX_CIBLE": params.get("MFIL_TAUX_CIBLE", 0.0),
         "MADH_TAUX_MIN": params["MADH_TAUX_MIN"],
         "MFIL_TAUX_MIN": params["MFIL_TAUX_MIN"],
         "INDICE_CIBLE": params["INDICE_CIBLE"],
@@ -78,6 +80,14 @@ OBJECTIFS: Dict[str, Dict[str, Any]] = {
     }
     for enseigne, params in ENSEIGNES.items()
 }
+
+# --- Objectifs annuels ---
+OBJECTIFS_ANNUELS_CONFIG: Dict[str, Any] = _RAW.get("objectifs_annuels", {})
+OBJECTIFS_ANNUELS_ACTIF: bool = OBJECTIFS_ANNUELS_CONFIG.get("actif", False)
+AMORTISSEMENT_CONFIG: Dict[str, Any] = OBJECTIFS_ANNUELS_CONFIG.get("amortissement", {})
+AMORTISSEMENT_COEF: float = AMORTISSEMENT_CONFIG.get("coef", 0.40)
+AMORTISSEMENT_ECART_MAX: float = AMORTISSEMENT_CONFIG.get("ecart_max_correction_pts", 3.0)
+TOLERANCE_CONFIG: Dict[str, Any] = OBJECTIFS_ANNUELS_CONFIG.get("tolerance", {})
 
 # --- Formules financieres ---
 TVA_DEFAULT: float = _RAW["formules"]["tva_default_pct"]
@@ -150,6 +160,15 @@ def validate_config() -> None:
             errors.append(f"{enseigne}: MLNI_TAUX doit etre > 0")
         if obj["INDICE_CIBLE"] <= 0:
             errors.append(f"{enseigne}: INDICE_CIBLE doit etre > 0")
+        # Validation decomposition MFIL + MADH (les taux ne s'additionnent pas
+        # directement a cause des denominateurs differents, mais les cibles doivent
+        # etre coherentes avec le MLNI global)
+        if obj["MADH_TAUX_CIBLE"] > 0 and obj["MFIL_TAUX_CIBLE"] > 0:
+            if obj["MADH_TAUX_CIBLE"] > obj["MLNI_TAUX"]:
+                errors.append(
+                    f"{enseigne}: MADH_TAUX_CIBLE ({obj['MADH_TAUX_CIBLE']}) "
+                    f"> MLNI_TAUX ({obj['MLNI_TAUX']})"
+                )
 
     # Monte Carlo
     if MC_N_SCENARIOS < 100:

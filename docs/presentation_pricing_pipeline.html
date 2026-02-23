@@ -364,6 +364,7 @@
     <a href="#montecarlo">Monte Carlo</a>
     <a href="#scoring">Scoring</a>
     <a href="#convergence">Convergence</a>
+    <a href="#objectifs-annuels">Objectifs Annuels</a>
     <a href="#sorties">Tables Sortie</a>
     <a href="#arborescence">Arborescence</a>
     <a href="#config">Configuration</a>
@@ -863,6 +864,240 @@ Score = 0.50 &times; S_marge + 0.35 &times; S_indice + 0.15 &times; S_lissage
       <tr><td>Indice CA comparable</td><td>102</td><td>100</td><td>&plusmn; 2 pts</td></tr>
     </tbody>
   </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 7b. OBJECTIFS ANNUELS — Decomposition MFIL / MADH + Anti coup de volant -->
+<!-- ====================================================================== -->
+<div class="section" id="objectifs-annuels">
+  <h2>7b. Objectifs Annuels &mdash; Decomposition MFIL / MADH par Base</h2>
+
+  <div class="alert alert-warn">
+    <strong>PRINCIPES FONDAMENTAUX :</strong><br>
+    &bull; Les objectifs MFIL, MADH et MLNI sont <strong>ANNUELS</strong>.<br>
+    &bull; On ne regarde <strong>PAS</strong> l'etat d'avancement courant ni le &laquo; reste a faire &raquo;.<br>
+    &bull; Les objectifs sont <strong>MOBILES</strong> et <strong>AJUSTABLES</strong> selon la situation de chaque base.<br>
+    &bull; Anti &laquo; coup de volant &raquo; : les corrections sont <strong>amorties</strong> pour eviter les a-coups.
+  </div>
+
+  <h3>7b.1 Validation de la decomposition</h3>
+  <p>A chaque run, le pipeline valide que la decomposition des marges est coherente :</p>
+  <div class="formula">
+MFIL_Val + MADH_Val = MLNI_Val     <span style="color:#718096"># TOUJOURS vrai en valeur (&euro;)</span>
+(PC - PA) + (CA_HT - PC) = CA_HT - PA
+  </div>
+
+  <div class="alert alert-info">
+    <strong>ATTENTION :</strong> en <strong>taux</strong>, cette egalite ne tient PAS car les denominateurs different :
+    <code>MADH_Taux = MADH_Val / CA_TTC</code> vs <code>MFIL_Taux = MFIL_Val / PC</code>.
+    La validation porte sur les <strong>valeurs</strong> (additives). Les <strong>taux</strong> sont pilotes separement.
+  </div>
+
+  <h3>7b.2 Objectifs cibles annuels</h3>
+  <table>
+    <thead>
+      <tr><th>Enseigne</th><th>MLNI Cible</th><th>MADH Cible</th><th>MFIL Cible</th><th>Indice Cible</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>INTERMARCHE</strong></td>
+        <td><strong>34.75%</strong></td>
+        <td><strong>15.00%</strong></td>
+        <td><strong>22.00%</strong></td>
+        <td>102</td>
+      </tr>
+      <tr>
+        <td><strong>NETTO</strong></td>
+        <td><strong>29.25%</strong></td>
+        <td><strong>12.00%</strong></td>
+        <td><strong>19.00%</strong></td>
+        <td>100</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:0.85rem; color: var(--text-light);">
+    Ces cibles sont <strong>modifiables</strong> dans <code>config/business_rules.yaml</code> section <code>enseignes</code>.
+  </p>
+
+  <h3>7b.3 Objectifs mobiles par base &mdash; Anti coup de volant</h3>
+  <p>Chaque base a une <strong>situation propre</strong>. A chaque run, on calcule une <strong>cible ajustee</strong> :</p>
+
+  <div class="cards">
+    <div class="card card-green">
+      <h4>Base en avance</h4>
+      <p>Taux observe <strong>&gt;</strong> cible annuelle<br>
+         &rarr; On relache <em>legerement</em> la cible (pas de coup de volant &rarr; on ne casse pas la dynamique)</p>
+    </div>
+    <div class="card card-red">
+      <h4>Base en retard</h4>
+      <p>Taux observe <strong>&lt;</strong> cible annuelle<br>
+         &rarr; On durcit <em>progressivement</em> la cible (rattrapage amorti, pas de choc)</p>
+    </div>
+    <div class="card card-orange">
+      <h4>Sur cible</h4>
+      <p>|Ecart| &le; tolerance<br>
+         &rarr; Pas de correction. On maintient la cible annuelle telle quelle.</p>
+    </div>
+  </div>
+
+  <h4>Formule d'amortissement</h4>
+  <div class="formula">
+ecart = taux_observe - cible_annuelle       <span style="color:#718096"># &gt; 0 = en avance, &lt; 0 = en retard</span>
+
+correction_brute = -ecart                   <span style="color:#718096"># ramener vers la cible</span>
+correction_amortie = correction_brute &times; <strong>coef_amortissement</strong>
+correction_effective = clip(correction_amortie, -ecart_max, +ecart_max)
+
+cible_ajustee = cible_annuelle + correction_effective
+cible_ajustee = clip(cible_ajustee, borne_min, borne_max)
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Parametre</th><th>Valeur</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>coef_amortissement</code></td>
+        <td><strong>0.40</strong> (40%)</td>
+        <td>On ne corrige que 40% de l'ecart a chaque run</td>
+      </tr>
+      <tr>
+        <td><code>ecart_max_correction_pts</code></td>
+        <td><strong>3.0 pts</strong></td>
+        <td>Jamais plus de &plusmn;3 pts de correction par run</td>
+      </tr>
+      <tr>
+        <td><code>ecart_alerte_pts</code></td>
+        <td><strong>5.0 pts</strong></td>
+        <td>Alerte si ecart &gt; 5 pts sur au moins une marge</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Exemple concret</h4>
+  <table>
+    <thead>
+      <tr><th>Base</th><th>MFIL Observe</th><th>MFIL Cible Annuel</th><th>Ecart</th><th>Correction (40%)</th><th>MFIL Cible Ajustee</th><th>Situation</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LYON (26)</td>
+        <td>25.0%</td>
+        <td>22.0%</td>
+        <td><span style="color:var(--success);">+3.0 pts</span></td>
+        <td>-1.2 pts</td>
+        <td><strong>20.8%</strong></td>
+        <td><span class="badge badge-green">en avance</span></td>
+      </tr>
+      <tr>
+        <td>AMILLY (55)</td>
+        <td>18.0%</td>
+        <td>22.0%</td>
+        <td><span style="color:var(--danger);">-4.0 pts</span></td>
+        <td>+1.6 pts</td>
+        <td><strong>23.6%</strong></td>
+        <td><span class="badge badge-red">en retard</span></td>
+      </tr>
+      <tr>
+        <td>AVION (20)</td>
+        <td>12.0%</td>
+        <td>22.0%</td>
+        <td><span style="color:var(--danger);">-10.0 pts</span></td>
+        <td>+3.0 pts <small>(cap)</small></td>
+        <td><strong>25.0%</strong></td>
+        <td><span class="badge badge-red">en retard</span> <span class="badge badge-orange">ALERTE</span></td>
+      </tr>
+      <tr>
+        <td>BEZIERS (10)</td>
+        <td>22.3%</td>
+        <td>22.0%</td>
+        <td><span style="color:var(--text-light);">+0.3 pts</span></td>
+        <td>0.0 pts</td>
+        <td><strong>22.0%</strong></td>
+        <td><span class="badge badge-gray">sur cible</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:0.85rem; color: var(--text-light); margin-top: 0.5rem;">
+    La base AVION est a -10 pts &mdash; on ne la force pas a +10 d'un coup (coup de volant).
+    On corrige de +3 pts max par run (cap). Si sur 3-4 runs elle converge,
+    c'est qu'elle a absorbe le rattrapage progressivement.
+  </p>
+
+  <h3>7b.4 Bornes de securite</h3>
+  <p>La cible ajustee ne peut jamais sortir de ces bornes, meme en cas d'ecart extreme :</p>
+  <table>
+    <thead>
+      <tr><th>Marge</th><th>Borne min</th><th>Borne max</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>MADH_Taux</code></td><td>5.0%</td><td>30.0%</td></tr>
+      <tr><td><code>MFIL_Taux</code></td><td>8.0%</td><td>35.0%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7b.5 Tolerances de convergence</h3>
+  <table>
+    <thead>
+      <tr><th>Marge</th><th>Tolerance</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>MLNI</code></td><td>&plusmn; 1.0 pt</td><td>Precision requise (marge globale)</td></tr>
+      <tr><td><code>MADH</code></td><td>&plusmn; 1.5 pts</td><td>Plus souple (levier adherent)</td></tr>
+      <tr><td><code>MFIL</code></td><td>&plusmn; 1.5 pts</td><td>Plus souple (levier filiere)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>7b.6 Integration dans le pipeline</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-title">Calcul marges observees par base</div>
+      <div class="step-desc">Agregation CA_TTC, MLNI_Val, MADH_Val, MFIL_Val par <code>CODBAS</code></div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+    <div class="flow-step active">
+      <div class="step-num">2</div>
+      <div class="step-title">Cibles ajustees par base (anti coup de volant)</div>
+      <div class="step-desc">
+        Pour chaque base : <code>compute_cible_ajustee()</code> sur MLNI, MADH, MFIL.<br>
+        Amortissement + cap + bornes de securite.
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-title">Injection dans le batch MC</div>
+      <div class="step-desc">
+        Chaque produit recoit les cibles ajustees de sa base via <code>inject_cibles_ajustees()</code>.<br>
+        Le Monte Carlo utilise ces cibles (pas les cibles fixes annuelles).
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-title">Validation decomposition</div>
+      <div class="step-desc">
+        Apres optimisation : <code>validate_decomposition()</code> verifie MFIL_Val + MADH_Val = MLNI_Val.<br>
+        Synthese reporting : nb bases en avance / retard / sur cible / alerte.
+      </div>
+    </div>
+  </div>
+
+  <h3>7b.7 Module Python</h3>
+  <div class="code-block">
+<span style="color:#718096"># src/perequation/objectifs_annuels.py</span>
+
+<span style="color:#63b3ed">from</span> src.perequation.objectifs_annuels <span style="color:#63b3ed">import</span> (
+    validate_decomposition,       <span style="color:#718096"># MFIL_Val + MADH_Val = MLNI_Val</span>
+    compute_cible_ajustee,        <span style="color:#718096"># cible mobile avec amortissement</span>
+    compute_objectifs_par_base,   <span style="color:#718096"># cibles ajustees pour les 19 bases</span>
+    inject_cibles_ajustees,       <span style="color:#718096"># enrichir les produits avant MC</span>
+    build_synthese_objectifs,     <span style="color:#718096"># resume pour reporting</span>
+)
+  </div>
 </div>
 
 

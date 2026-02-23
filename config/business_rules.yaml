@@ -54,9 +54,16 @@ produits:
 # -----------------------------------------------------------------------------
 # 2. ENSEIGNES & OBJECTIFS
 # -----------------------------------------------------------------------------
+# MLNI = MADH + MFIL (en valeur). Les 3 taux sont des objectifs ANNUELS.
+# La decomposition MFIL/MADH est validee a chaque run : le pipeline verifie
+# que la somme MFIL_Val + MADH_Val = MLNI_Val et que chaque composante
+# converge vers sa cible annuelle.
+#
 enseignes:
   INTERMARCHE:
-    MLNI_TAUX: 34.75                          # Objectif MLNI global (%)
+    MLNI_TAUX: 34.75                          # Objectif MLNI global annuel (%)
+    MADH_TAUX_CIBLE: 15.00                    # Objectif MADH annuel (%)
+    MFIL_TAUX_CIBLE: 22.00                    # Objectif MFIL annuel (%)
     MADH_TAUX_MIN: 0.0                        # Marge adherent >= 0
     MFIL_TAUX_MIN: 0.0                        # Marge filiere >= 0
     concurrent_reference: "E.Leclerc"
@@ -64,12 +71,55 @@ enseignes:
     INDICE_CIBLE: 102.0                       # ITM vs E.Leclerc (base 100)
 
   NETTO:
-    MLNI_TAUX: 29.25                          # Objectif MLNI global (%)
+    MLNI_TAUX: 29.25                          # Objectif MLNI global annuel (%)
+    MADH_TAUX_CIBLE: 12.00                    # Objectif MADH annuel (%)
+    MFIL_TAUX_CIBLE: 19.00                    # Objectif MFIL annuel (%)
     MADH_TAUX_MIN: 0.0
     MFIL_TAUX_MIN: 0.0
     concurrent_reference: "Lidl"
     colonne_prix_concurrent: "Prix_Moyen_LIDL"
     INDICE_CIBLE: 100.0                       # Netto vs Lidl (parite)
+
+
+# -----------------------------------------------------------------------------
+# 2b. OBJECTIFS ANNUELS — Decomposition & pilotage par base
+# -----------------------------------------------------------------------------
+# Les objectifs MLNI, MFIL, MADH sont ANNUELS et MOBILES.
+# Chaque base a sa propre trajectoire.
+# Le module objectifs_annuels.py calcule la cible ajustee par base x run.
+#
+# PRINCIPES :
+#   - On ne regarde PAS l'etat d'avancement (reste a faire).
+#   - On ajuste dynamiquement selon la situation de chaque base.
+#   - Anti "coup de volant" : les corrections sont amorties.
+#
+objectifs_annuels:
+  actif: true
+
+  # Validation decomposition : MFIL_Val + MADH_Val = MLNI_Val
+  validation_decomposition: true
+
+  # Amortissement des corrections (anti coup de volant)
+  # Si une base est en ecart de +5pts sur MFIL, on ne corrige pas de -5pts d'un coup.
+  # On applique un coefficient d'amortissement :
+  #   correction_effective = ecart * coef_amortissement
+  amortissement:
+    coef: 0.40                                # 40% de l'ecart par run max
+    ecart_max_correction_pts: 3.0             # jamais plus de ±3pts de correction par run
+    ecart_alerte_pts: 5.0                     # alerte si ecart > 5pts
+
+  # Tolerance : on considere l'objectif atteint si |ecart| <= tolerance
+  tolerance:
+    MLNI_pts: 1.0                             # ±1pt
+    MADH_pts: 1.5                             # ±1.5pt (plus souple)
+    MFIL_pts: 1.5                             # ±1.5pt (plus souple)
+
+  # Bornes de securite : la cible ajustee ne peut jamais sortir de ces bornes
+  bornes_cible:
+    MADH_TAUX_MIN: 5.0                        # jamais en dessous de 5%
+    MADH_TAUX_MAX: 30.0                       # jamais au-dessus de 30%
+    MFIL_TAUX_MIN: 8.0                        # jamais en dessous de 8%
+    MFIL_TAUX_MAX: 35.0                       # jamais au-dessus de 35%
 
 
 # -----------------------------------------------------------------------------

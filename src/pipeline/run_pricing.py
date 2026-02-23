@@ -34,6 +34,7 @@ import pandas as pd
 from src.config import (
     BASES,
     OBJECTIFS,
+    OBJECTIFS_ANNUELS_ACTIF,
     PRICING_SCHEDULE,
     MODES,
     TVA_DEFAULT,
@@ -143,6 +144,30 @@ class PricingPipeline:
                     print(f"  {enseigne} : MLNI NS requis = {mlni_ns_req:.2f}%")
 
         # ================================================================
+        # STEP 3b — OBJECTIFS ANNUELS PAR BASE (si actif)
+        # ================================================================
+        all_objectifs_base = {}
+        all_synthese_obj = {}
+
+        if OBJECTIFS_ANNUELS_ACTIF:
+            print("\n--- STEP 3b : Objectifs annuels MFIL/MADH par base ---")
+            for enseigne in OBJECTIFS:
+                df_obj_base = self._compute_objectifs_annuels(
+                    df_suivi, df_ns, enseigne,
+                )
+                if df_obj_base is not None and not df_obj_base.empty:
+                    all_objectifs_base[enseigne] = df_obj_base
+                    from src.perequation.objectifs_annuels import build_synthese_objectifs
+                    synth = build_synthese_objectifs(df_obj_base, enseigne)
+                    all_synthese_obj[enseigne] = synth
+                    obj_e = OBJECTIFS[enseigne]
+                    print(f"  {enseigne} : {len(df_obj_base)} bases")
+                    print(f"    MLNI annuel={obj_e['MLNI_TAUX']}%, "
+                          f"MADH annuel={obj_e['MADH_TAUX_CIBLE']}%, "
+                          f"MFIL annuel={obj_e['MFIL_TAUX_CIBLE']}%")
+                    print(f"    Alertes : {synth.get('nb_alertes', 0)} bases")
+
+        # ================================================================
         # STEP 4 — MONTE CARLO ITERATIF (par enseigne)
         # ================================================================
         print("\n--- STEP 4 : Optimisation Monte Carlo iterative ---")
@@ -156,12 +181,27 @@ class PricingPipeline:
                 print(f"  {enseigne} : aucun produit SUIVI.")
                 continue
 
+            # Injecter les cibles ajustees par base si actif
+            if OBJECTIFS_ANNUELS_ACTIF and enseigne in all_objectifs_base:
+                from src.perequation.objectifs_annuels import inject_cibles_ajustees
+                df_ens = inject_cibles_ajustees(df_ens, all_objectifs_base[enseigne])
+                print(f"  {enseigne} : cibles ajustees injectees dans {len(df_ens):,} produits.")
+
             df_ns_ens = df_ns[df_ns["Enseigne"] == enseigne] if "Enseigne" in df_ns.columns else df_ns
 
             print(f"\n  --- {enseigne} ({len(df_ens):,} produits) ---")
             df_reco, portfolio = self._run_optimization_iterative(
                 df_ens, df_ns_ens, enseigne,
             )
+
+            # Valider la decomposition MFIL + MADH = MLNI
+            if OBJECTIFS_ANNUELS_ACTIF and not df_reco.empty:
+                from src.perequation.objectifs_annuels import validate_decomposition
+                required_cols = {"MADH_Val", "MFIL_Val", "MLNI_Val"}
+                if required_cols.issubset(set(df_reco.columns)):
+                    df_reco = validate_decomposition(df_reco)
+                    n_ok = df_reco["decomposition_ok"].sum()
+                    print(f"    Decomposition MFIL+MADH=MLNI : {n_ok}/{len(df_reco)} OK")
 
             if not df_reco.empty:
                 all_recos.append(df_reco)
@@ -212,6 +252,13 @@ class PricingPipeline:
                     for m in all_portfolio.values()
                 ])
                 tables_to_write["portfolio_metrics"] = df_portfolio
+
+            # Objectifs annuels par base
+            if all_objectifs_base:
+                df_obj_all = pd.concat(
+                    list(all_objectifs_base.values()), ignore_index=True,
+                )
+                tables_to_write["objectifs_annuels_base"] = df_obj_all
 
             output_tables = writer.write_all(tables_to_write)
 
@@ -325,6 +372,65 @@ class PricingPipeline:
             return pd.DataFrame()
 
         return compute_perequation_targets(matrix, enseigne)
+
+    def _compute_objectifs_annuels(
+        self,
+        df_suivi: pd.DataFrame,
+        df_ns: pd.DataFrame,
+        enseigne: str,
+    ):
+        """Calcule les objectifs annuels MFIL/MADH ajustes par base."""
+        from src.perequation.objectifs_annuels import compute_objectifs_par_base
+
+        # Combiner SUIVI + NS pour avoir les marges totales par base
+        df_all = pd.concat([df_suivi, df_ns], ignore_index=True)
+        if "Enseigne" in df_all.columns:
+            df_all = df_all[df_all["Enseigne"] == enseigne]
+
+        if df_all.empty:
+            return pd.DataFrame()
+
+        coef_tva = 1.0 + TVA_DEFAULT / 100.0
+
+        # Calculer les marges si pas deja presentes
+        if "MLNI_Val" not in df_all.columns:
+            if "CA_HT" in df_all.columns and "Val_Achat" in df_all.columns:
+                df_all["MLNI_Val"] = df_all["CA_HT"] - df_all["Val_Achat"]
+            elif "CA_TTC" in df_all.columns and "Val_Achat" in df_all.columns:
+                df_all["MLNI_Val"] = df_all["CA_TTC"] / coef_tva - df_all["Val_Achat"]
+        if "MADH_Val" not in df_all.columns:
+            if "CA_HT" in df_all.columns and "Val_Cession" in df_all.columns:
+                df_all["MADH_Val"] = df_all["CA_HT"] - df_all["Val_Cession"]
+        if "MFIL_Val" not in df_all.columns:
+            if "Val_Cession" in df_all.columns and "Val_Achat" in df_all.columns:
+                df_all["MFIL_Val"] = df_all["Val_Cession"] - df_all["Val_Achat"]
+
+        # Agreger par base
+        agg_cols = {}
+        for col in ["CA_TTC", "CA_HT", "Val_Cession", "Val_Achat", "MLNI_Val", "MADH_Val", "MFIL_Val"]:
+            if col in df_all.columns:
+                agg_cols[col] = "sum"
+
+        if not agg_cols:
+            return pd.DataFrame()
+
+        df_base = df_all.groupby("CODBAS").agg(agg_cols).reset_index()
+
+        # Calculer les taux par base
+        if "CA_TTC" in df_base.columns and "MLNI_Val" in df_base.columns:
+            df_base["MLNI_Taux"] = (
+                df_base["MLNI_Val"] / df_base["CA_TTC"] * 100
+            ).where(df_base["CA_TTC"] > 0, 0)
+        if "CA_TTC" in df_base.columns and "MADH_Val" in df_base.columns:
+            df_base["MADH_Taux"] = (
+                df_base["MADH_Val"] / df_base["CA_TTC"] * 100
+            ).where(df_base["CA_TTC"] > 0, 0)
+        if "Val_Cession" in df_base.columns and "MFIL_Val" in df_base.columns:
+            df_base["MFIL_Taux"] = (
+                df_base["MFIL_Val"] / df_base["Val_Cession"] * 100
+            ).where(df_base["Val_Cession"] > 0, 0)
+
+        return compute_objectifs_par_base(df_base, enseigne)
 
     def _run_optimization_iterative(
         self,
