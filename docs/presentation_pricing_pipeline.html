@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing Pipeline SCAFLF F&L — Documentation Technique</title>
+<style>
+  :root {
+    --primary: #1a365d;
+    --primary-light: #2b6cb0;
+    --accent: #ed8936;
+    --accent-light: #fbd38d;
+    --success: #38a169;
+    --danger: #e53e3e;
+    --warning: #d69e2e;
+    --bg: #f7fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #2d3748;
+    --text-light: #718096;
+    --code-bg: #1a202c;
+    --code-text: #e2e8f0;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 3rem 2rem;
+    text-align: center;
+  }
+  .header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; letter-spacing: -0.5px; }
+  .header .subtitle { font-size: 1.1rem; opacity: 0.85; }
+  .header .meta {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+  .header .meta-item {
+    background: rgba(255,255,255,0.15);
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  /* Navigation */
+  .nav {
+    background: white;
+    border-bottom: 2px solid var(--border);
+    padding: 0.8rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .nav a {
+    text-decoration: none;
+    color: var(--primary);
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .nav a:hover { background: var(--primary); color: white; }
+
+  /* Main content */
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+  /* Sections */
+  .section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 1px solid var(--border);
+  }
+  .section h2 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section h3 {
+    font-size: 1.15rem;
+    color: var(--primary-light);
+    margin: 1.5rem 0 0.8rem 0;
+  }
+  .section h4 {
+    font-size: 1rem;
+    color: var(--text);
+    margin: 1rem 0 0.5rem 0;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .badge-green { background: #c6f6d5; color: #22543d; }
+  .badge-orange { background: #fefcbf; color: #744210; }
+  .badge-red { background: #fed7d7; color: #742a2a; }
+  .badge-blue { background: #bee3f8; color: #2a4365; }
+  .badge-purple { background: #e9d8fd; color: #44337a; }
+  .badge-gray { background: #edf2f7; color: #4a5568; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 0.7rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:hover td { background: #edf2f7; }
+  tr:nth-child(even) td { background: #f7fafc; }
+  tr:nth-child(even):hover td { background: #edf2f7; }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1.2rem;
+    border-radius: 8px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    line-height: 1.5;
+    margin: 1rem 0;
+  }
+  code {
+    background: #edf2f7;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.88em;
+    color: var(--primary);
+  }
+
+  /* Flow diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 1.5rem 0; }
+  .flow-step {
+    background: white;
+    border: 2px solid var(--primary);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    width: 100%;
+    max-width: 750px;
+    position: relative;
+  }
+  .flow-step.active { border-color: var(--accent); background: #fffaf0; }
+  .flow-step.loop { border-color: var(--success); border-style: dashed; background: #f0fff4; }
+  .flow-step .step-num {
+    position: absolute;
+    top: -12px;
+    left: 20px;
+    background: var(--primary);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .flow-step.active .step-num { background: var(--accent); }
+  .flow-step.loop .step-num { background: var(--success); }
+  .flow-step .step-title { font-weight: 700; font-size: 1rem; color: var(--primary); }
+  .flow-step.active .step-title { color: #c05621; }
+  .flow-step.loop .step-title { color: #276749; }
+  .flow-step .step-desc { font-size: 0.88rem; color: var(--text-light); margin-top: 0.3rem; }
+  .flow-arrow {
+    color: var(--text-light);
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 0.2rem 0;
+  }
+
+  /* Cards grid */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    border-left: 4px solid var(--primary);
+  }
+  .card.card-orange { border-left-color: var(--accent); }
+  .card.card-green { border-left-color: var(--success); }
+  .card.card-red { border-left-color: var(--danger); }
+  .card h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+  .card p { font-size: 0.88rem; color: var(--text-light); margin: 0; }
+
+  /* Formula */
+  .formula {
+    background: #fffff0;
+    border: 1px solid #fefcbf;
+    border-left: 4px solid var(--warning);
+    padding: 1rem 1.2rem;
+    border-radius: 0 8px 8px 0;
+    margin: 0.8rem 0;
+    font-family: 'Cascadia Code', monospace;
+    font-size: 0.88rem;
+    overflow-x: auto;
+  }
+
+  /* Tree */
+  .tree {
+    font-family: 'Cascadia Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1.5rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+  .tree .dir { color: #63b3ed; font-weight: 600; }
+  .tree .file { color: #a0aec0; }
+  .tree .highlight { color: #fbd38d; font-weight: 600; }
+  .tree .comment { color: #718096; font-style: italic; }
+
+  /* Alert boxes */
+  .alert {
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  .alert-info { background: #ebf8ff; border-left: 4px solid var(--primary-light); }
+  .alert-warn { background: #fffff0; border-left: 4px solid var(--warning); }
+  .alert-success { background: #f0fff4; border-left: 4px solid var(--success); }
+
+  /* Two-column layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: 1fr; }
+  }
+
+  /* Score visualization */
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.3rem 0;
+  }
+  .score-bar .bar {
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Print styles */
+  @media print {
+    .nav { display: none; }
+    .section { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* Iteration loop diagram */
+  .loop-box {
+    border: 2px dashed var(--success);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    background: #f0fff4;
+    position: relative;
+  }
+  .loop-box .loop-label {
+    position: absolute;
+    top: -12px;
+    right: 20px;
+    background: var(--success);
+    color: white;
+    padding: 0.2rem 0.8rem;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================================================================== -->
+<!-- HEADER                                                                 -->
+<!-- ====================================================================== -->
+<div class="header">
+  <h1>Pricing Pipeline SCAFLF</h1>
+  <div class="subtitle">Optimisation des prix Fruits &amp; Legumes &mdash; INTERMARCHE &amp; NETTO</div>
+  <div class="meta">
+    <div class="meta-item">19 bases logistiques</div>
+    <div class="meta-item">2 enseignes</div>
+    <div class="meta-item">10 000 scenarios MC / produit</div>
+    <div class="meta-item">Bi-hebdomadaire (Ven + Mar)</div>
+    <div class="meta-item">Sortie Databricks Delta</div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- NAVIGATION                                                             -->
+<!-- ====================================================================== -->
+<div class="nav">
+  <div class="nav-inner">
+    <a href="#flux">Flux Pipeline</a>
+    <a href="#entrees">Tables Entree</a>
+    <a href="#calculs">Calculs &amp; Formules</a>
+    <a href="#perequation">Perequation</a>
+    <a href="#montecarlo">Monte Carlo</a>
+    <a href="#scoring">Scoring</a>
+    <a href="#convergence">Convergence</a>
+    <a href="#sorties">Tables Sortie</a>
+    <a href="#arborescence">Arborescence</a>
+    <a href="#config">Configuration</a>
+    <a href="#bases">Bases</a>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ====================================================================== -->
+<!-- 1. FLUX PIPELINE                                                       -->
+<!-- ====================================================================== -->
+<div class="section" id="flux">
+  <h2>1. Flux Pipeline Complet</h2>
+  <p>Le pipeline s'execute en mode bi-hebdomadaire (vendredi = run principal J+7, mardi = reajustement J+4).
+     Chaque run traverse 5 etapes sequentielles, avec une <strong>boucle iterative</strong> a l'etape 4.</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-title">FORECAST &mdash; LightGBM V2</div>
+      <div class="step-desc">
+        Predictions <code>Qte_Pred</code> et <code>CA_Pred</code> par produit &times; base &times; jour
+        sur l'horizon (J+7 vendredi, J+4 mardi). Modele LightGBM, 53 features, 1.3% MAPE au CA base.
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-title">SEPARATION &mdash; 3 populations</div>
+      <div class="step-desc">
+        <span class="badge badge-green">SUIVI</span> Assortiment de base &rarr; <strong>optimise</strong><br>
+        <span class="badge badge-orange">NON SUIVI</span> Operations promo &rarr; passthrough (JAMAIS touche)<br>
+        <span class="badge badge-red">POLCO</span> Prix imposes (ITM only) &rarr; reporte a part
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+
+    <div class="flow-step active">
+      <div class="step-num">3</div>
+      <div class="step-title">PEREQUATION &mdash; Cible MLNI NS</div>
+      <div class="step-desc">
+        <strong>SE CALCULE AVANT LE MONTE CARLO.</strong>
+        Equilibre la marge entre SUIVI et NON SUIVI.
+        Calcule le <code>MLNI_NS_Requis</code> pour atteindre l'objectif global.
+        Ce taux devient une <strong>cible</strong> au meme titre que l'indice concurrent.
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+
+    <div class="flow-step loop">
+      <div class="step-num">4</div>
+      <div class="step-title">MONTE CARLO ITERATIF &mdash; par enseigne &times; base</div>
+      <div class="step-desc">
+        <strong>Boucle iterative (max 5 iterations)</strong> :
+        generer 10K scenarios &rarr; scorer &rarr; check portfolio
+        &rarr; si non convergent &rarr; re-iterer avec bornes ajustees.
+      </div>
+    </div>
+    <div class="flow-arrow">&darr;</div>
+
+    <div class="flow-step">
+      <div class="step-num">5</div>
+      <div class="step-title">SORTIE &mdash; Tables Databricks Delta</div>
+      <div class="step-desc">
+        6 tables en mode <code>append</code>, partitionnees par <code>run_id</code>.
+        Archivage des recommandations pour historique et audit.
+        Compatible Power BI / DAX.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 2. TABLES D'ENTREE                                                     -->
+<!-- ====================================================================== -->
+<div class="section" id="entrees">
+  <h2>2. Donnees d'Entree (Sources)</h2>
+
+  <h3>2.1 Tables / fichiers requis</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>Type</th>
+        <th>Granularite</th>
+        <th>Colonnes cles</th>
+        <th>Usage</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>VF Financier (historique)</strong></td>
+        <td><span class="badge badge-blue">Databricks / Parquet</span></td>
+        <td>Produit &times; Base &times; Jour</td>
+        <td><code>CODE_PRODUIT_STANDARD</code>, <code>CODBAS</code>, <code>Enseigne</code>, <code>Date</code></td>
+        <td>Features forecast + perequation historique</td>
+      </tr>
+      <tr>
+        <td><strong>Indices Prix Concurrents</strong></td>
+        <td><span class="badge badge-blue">Databricks / Parquet</span></td>
+        <td>Produit &times; Base</td>
+        <td><code>Prix_Moyen_LCL</code>, <code>Prix_Moyen_LIDL</code>, <code>Coef_Ponderation</code></td>
+        <td>Indice CA comparable, bornes PVC_max</td>
+      </tr>
+      <tr>
+        <td><strong>POLCO (PRICING_FFL_*.csv)</strong></td>
+        <td><span class="badge badge-orange">CSV windows-1252</span></td>
+        <td>Produit &times; Semaine FFL</td>
+        <td><code>Code_CPS</code>, <code>Prix_brut</code> (format "00001,99")</td>
+        <td>PVC imposes INTERMARCHE</td>
+      </tr>
+      <tr>
+        <td><strong>Referentiel Produits</strong></td>
+        <td><span class="badge badge-blue">Databricks</span></td>
+        <td>Produit</td>
+        <td><code>Maille_Suivi</code> (SUIVI / NON SUIVI)</td>
+        <td>Separation des 3 populations</td>
+      </tr>
+      <tr>
+        <td><strong>Previsions Volume/CA</strong></td>
+        <td><span class="badge badge-blue">Databricks</span></td>
+        <td>Produit &times; Base &times; Semaine</td>
+        <td><code>Qte_Pred</code>, <code>CA_Pred</code></td>
+        <td>Perequation previsionnelle + mix volume</td>
+      </tr>
+      <tr>
+        <td><strong>Meteo (Open-Meteo API)</strong></td>
+        <td><span class="badge badge-purple">API REST</span></td>
+        <td>Base &times; Jour</td>
+        <td><code>temperature_2m_max</code>, <code>precipitation_sum</code>, <code>uv_index_max</code>&hellip;</td>
+        <td>Features forecast (saisonnalite locale)</td>
+      </tr>
+      <tr>
+        <td><strong>Modele LightGBM entraine</strong></td>
+        <td><span class="badge badge-gray">Joblib</span></td>
+        <td>Fichier unique</td>
+        <td><code>forecast_lgbm.joblib</code></td>
+        <td>Predictions Qte/CA</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Colonnes financieres detaillees</h3>
+  <table>
+    <thead>
+      <tr><th>Colonne</th><th>Description</th><th>Unite</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>CA_TTC</code></td><td>Chiffre d'affaires TTC (= PVC &times; Qte)</td><td>&euro;</td></tr>
+      <tr><td><code>CA_HT</code></td><td>CA hors taxes = CA_TTC / (1 + TVA/100)</td><td>&euro;</td></tr>
+      <tr><td><code>Val_Cession</code></td><td>Valeur de cession (PC &times; Qte) &mdash; prix adherent</td><td>&euro;</td></tr>
+      <tr><td><code>Val_Achat</code></td><td>Valeur d'achat (PA &times; Qte) &mdash; prix filiere</td><td>&euro;</td></tr>
+      <tr><td><code>Qte_Reelle</code></td><td>Quantites vendues</td><td>unites</td></tr>
+      <tr><td><code>PVC</code></td><td>Prix de vente consommateur TTC</td><td>&euro;</td></tr>
+      <tr><td><code>PA</code></td><td>Prix d'achat unitaire (filiere)</td><td>&euro;</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 3. CALCULS & FORMULES                                                  -->
+<!-- ====================================================================== -->
+<div class="section" id="calculs">
+  <h2>3. Calculs &amp; Formules Financieres</h2>
+
+  <div class="alert alert-warn">
+    <strong>CRITIQUES</strong> &mdash; Ne pas modifier sans validation metier + recette complete.
+    Les denominateurs des taux de marge sont specifiques au modele SCAFLF.
+  </div>
+
+  <h3>3.1 Les 3 marges du modele SCAFLF</h3>
+  <div class="two-col">
+    <div>
+      <h4>Valeurs</h4>
+      <div class="formula">
+CA_TTC    = PVC                        <span style="color:#718096"># prix TTC consommateur</span>
+CA_HT     = PVC / (1 + TVA/100)        <span style="color:#718096"># TVA F&L = 5.5%</span>
+
+MADH_Val  = CA_HT - PC                 <span style="color:#718096"># marge adherent</span>
+MFIL_Val  = PC - PA                    <span style="color:#718096"># marge filiere</span>
+MLNI_Val  = CA_HT - PA                 <span style="color:#718096"># marge ligne nette ITM</span>
+      </div>
+    </div>
+    <div>
+      <h4>Taux (%)</h4>
+      <div class="formula">
+MADH_Taux = MADH_Val / <strong>CA_TTC</strong> &times; 100  <span style="color:#718096"># denom = CA TTC !</span>
+MFIL_Taux = MFIL_Val / <strong>PC</strong>     &times; 100  <span style="color:#718096"># denom = Val_Cession</span>
+MLNI_Taux = MLNI_Val / <strong>CA_TTC</strong> &times; 100  <span style="color:#718096"># denom = CA TTC</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>3.2 Decomposition visuelle de la marge</h3>
+  <div style="margin:1rem 0; background: #f7fafc; padding: 1.5rem; border-radius: 8px; text-align: center;">
+    <div style="display:flex; max-width: 600px; margin: 0 auto; border-radius: 8px; overflow: hidden; font-size: 0.85rem; font-weight: 600;">
+      <div style="background: #e53e3e; color:white; padding: 1rem; flex: 3;">PA<br><small style="font-weight:400">Prix Achat</small></div>
+      <div style="background: #ed8936; color:white; padding: 1rem; flex: 2;">MFIL<br><small style="font-weight:400">PC - PA</small></div>
+      <div style="background: #38a169; color:white; padding: 1rem; flex: 2;">MADH<br><small style="font-weight:400">CA_HT - PC</small></div>
+      <div style="background: #805ad5; color:white; padding: 1rem; flex: 0.5;">TVA<br><small style="font-weight:400">5.5%</small></div>
+    </div>
+    <div style="display:flex; max-width: 600px; margin: 0.5rem auto 0; font-size: 0.8rem; color: var(--text-light);">
+      <div style="flex:3; text-align:center">|&larr; Val_Achat &rarr;|</div>
+      <div style="flex:2; text-align:center">|&larr; MFIL &rarr;|</div>
+      <div style="flex:2; text-align:center">|&larr; MADH &rarr;|</div>
+      <div style="flex:0.5"></div>
+    </div>
+    <div style="display:flex; max-width: 600px; margin: 0.2rem auto 0; font-size: 0.8rem;">
+      <div style="flex:3"></div>
+      <div style="flex:4; text-align:center; border-top: 2px solid var(--primary); padding-top: 0.3rem; color: var(--primary); font-weight: 600;">
+        |&larr;&mdash;&mdash; MLNI = CA_HT - PA &mdash;&mdash;&rarr;|
+      </div>
+      <div style="flex:0.5"></div>
+    </div>
+    <div style="max-width: 600px; margin: 0.2rem auto 0; border-top: 2px solid var(--text); padding-top: 0.3rem; font-size: 0.8rem; font-weight: 600;">
+      |&larr;&mdash;&mdash;&mdash;&mdash; PVC (CA_TTC) &mdash;&mdash;&mdash;&mdash;&rarr;|
+    </div>
+  </div>
+
+  <h3>3.3 Indice prix (CA comparable)</h3>
+  <div class="formula">
+Indice_CA = &Sigma;(PVC<sub>i</sub> &times; Qte<sub>i</sub> &times; Coef<sub>i</sub>) / &Sigma;(PrixConc<sub>i</sub> &times; Qte<sub>i</sub> &times; Coef<sub>i</sub>) &times; 100
+  </div>
+  <div class="alert alert-info">
+    <strong>V5 FIX</strong> : ce n'est PAS une moyenne simple des ratios individuels.
+    L'ancienne formule donnait 3.98 pts d'ecart sur NETTO.
+  </div>
+
+  <h3>3.4 Objectifs par enseigne</h3>
+  <table>
+    <thead>
+      <tr><th>Enseigne</th><th>MLNI Cible</th><th>Concurrent</th><th>Indice Cible</th><th>MADH min</th><th>MFIL min</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>INTERMARCHE</strong></td>
+        <td><strong>34.75%</strong></td>
+        <td>E.Leclerc (<code>Prix_Moyen_LCL</code>)</td>
+        <td><strong>102</strong> (2% au-dessus)</td>
+        <td>&ge; 0%</td>
+        <td>&ge; 0%</td>
+      </tr>
+      <tr>
+        <td><strong>NETTO</strong></td>
+        <td><strong>29.25%</strong></td>
+        <td>Lidl (<code>Prix_Moyen_LIDL</code>)</td>
+        <td><strong>100</strong> (parite)</td>
+        <td>&ge; 0%</td>
+        <td>&ge; 0%</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 4. PEREQUATION                                                         -->
+<!-- ====================================================================== -->
+<div class="section" id="perequation">
+  <h2>4. Perequation SUIVI / NON SUIVI</h2>
+
+  <div class="alert alert-warn">
+    <strong>AVANT LE MONTE CARLO</strong> &mdash; La perequation fournit la cible MLNI NS
+    qui alimente le MC comme contrainte. C'est un pre-requis, pas un post-traitement.
+  </div>
+
+  <h3>4.1 Principe</h3>
+  <p>La marge globale (MLNI total) est le mix pondere des marges SUIVI et NON SUIVI :</p>
+  <div class="formula">
+MLNI_total = (CA_suivi &times; MLNI_suivi + CA_ns &times; MLNI_ns) / CA_total
+  </div>
+
+  <p>On inverse pour trouver le MLNI NS requis :</p>
+  <div class="formula">
+MLNI_NS_requis = (MLNI_cible &times; CA_total - MLNI_suivi &times; CA_suivi) / CA_ns
+  </div>
+
+  <h3>4.2 Matrice de perequation</h3>
+  <p>Granularite : <code>Semaine_FFL</code> &times; <code>CODBAS</code> &times; <code>Enseigne</code></p>
+  <table>
+    <thead>
+      <tr><th>Colonne</th><th>_SUIVI</th><th>_NS</th><th>_TOTAL</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>CA_TTC</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>CA_HT</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>Val_Cession</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>Val_Achat</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>MLNI_Val</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>MADH_Val</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>MFIL_Val</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+      <tr><td><code>Qte_Reelle</code></td><td>&check;</td><td>&check;</td><td>&check;</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.3 Indicateurs derives</h3>
+  <table>
+    <thead>
+      <tr><th>Indicateur</th><th>Formule</th><th>Usage</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Part_NS_Pct</code></td>
+        <td>CA_TTC_NS / CA_TTC_TOTAL &times; 100</td>
+        <td>Poids du NS dans le CA total</td>
+      </tr>
+      <tr>
+        <td><code>MLNI_NS_Requis</code></td>
+        <td>Voir formule ci-dessus</td>
+        <td>Marge NS necessaire &rarr; cible MC</td>
+      </tr>
+      <tr>
+        <td><code>Ecart_MLNI_Total</code></td>
+        <td>MLNI_Taux_TOTAL - MLNI_Cible</td>
+        <td>Ecart vs objectif enseigne</td>
+      </tr>
+      <tr>
+        <td><code>Sensibilite_1pt_NS</code></td>
+        <td>CA_NS / CA_TOTAL</td>
+        <td>Impact de +1pt MLNI NS sur le total</td>
+      </tr>
+      <tr>
+        <td><code>NS_Requis_Realiste</code></td>
+        <td>MLNI_NS_Requis &lt; 50%</td>
+        <td>Flag faisabilite</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 5. MONTE CARLO                                                         -->
+<!-- ====================================================================== -->
+<div class="section" id="montecarlo">
+  <h2>5. Monte Carlo &mdash; Generation de Scenarios</h2>
+
+  <h3>5.1 Parametres</h3>
+  <table>
+    <thead>
+      <tr><th>Parametre</th><th>Valeur</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>n_scenarios</code></td><td><strong>10 000</strong></td><td>Tirages par produit &times; base</td></tr>
+      <tr><td><code>pvc_variation_pct</code></td><td><strong>15%</strong></td><td>Amplitude max autour du PVC actuel</td></tr>
+      <tr><td><code>seed</code></td><td><strong>42</strong></td><td>Reproductibilite des tirages</td></tr>
+      <tr><td><code>paliers PVC</code></td><td><strong>X.X9</strong></td><td>0.09, 0.19, 0.29 ... 9.99 (pas 0.10)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 Bornes de prix par produit</h3>
+  <div class="cards">
+    <div class="card card-red">
+      <h4>PVC_min (plancher marge)</h4>
+      <div class="formula" style="margin:0.5rem 0">PVC_min = PA / (1/coef_tva - MLNI_cible/100)</div>
+      <p>Garantit que la marge MLNI &ge; objectif</p>
+    </div>
+    <div class="card card-green">
+      <h4>PVC_max (plafond indice)</h4>
+      <div class="formula" style="margin:0.5rem 0">PVC_max = Prix_Concurrent &times; Indice_Cible / 100</div>
+      <p>Garantit l'indice prix vs concurrent</p>
+    </div>
+    <div class="card">
+      <h4>Variation max</h4>
+      <div class="formula" style="margin:0.5rem 0">PVC &isin; [PVC_current &times; 0.85, PVC_current &times; 1.15]</div>
+      <p>Anti-volatilite : &plusmn;15% max</p>
+    </div>
+    <div class="card card-orange">
+      <h4>Bornes PC (cession)</h4>
+      <div class="formula" style="margin:0.5rem 0">PC_min = PA     &rarr; MFIL &ge; 0
+PC_max = CA_HT  &rarr; MADH &ge; 0</div>
+      <p>Filiere et adherent ne perdent jamais</p>
+    </div>
+  </div>
+
+  <h3>5.3 Produits en tension</h3>
+  <p>Quand <code>PVC_min</code> (marge plancher) &gt; <code>PVC_max</code> (indice plafond), le produit est en
+     <span class="badge badge-red">tension</span>. Le simulateur applique une relaxation progressive :</p>
+  <ol style="margin-left:1.5rem; font-size:0.9rem;">
+    <li>Midpoint entre les 2 bornes, &plusmn;5%</li>
+    <li>Si toujours infaisable : &plusmn;3% autour du PVC actuel</li>
+    <li>Dernier recours : &plusmn;1% autour du PVC actuel</li>
+  </ol>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 6. SCORING                                                             -->
+<!-- ====================================================================== -->
+<div class="section" id="scoring">
+  <h2>6. Scoring Multi-Criteres</h2>
+
+  <div class="formula">
+Score = 0.50 &times; S_marge + 0.35 &times; S_indice + 0.15 &times; S_lissage
+  </div>
+
+  <h3>6.1 Decomposition du score</h3>
+  <div style="margin: 1rem 0;">
+    <div class="score-bar">
+      <span style="width:120px; font-size:0.85rem; font-weight:600;">Marge (50%)</span>
+      <div class="bar" style="background: linear-gradient(90deg, #e53e3e 0%, #38a169 100%); width: 50%;">MLNI 0% &rarr; 50%</div>
+    </div>
+    <div class="score-bar">
+      <span style="width:120px; font-size:0.85rem; font-weight:600;">Indice (35%)</span>
+      <div class="bar" style="background: linear-gradient(90deg, #d69e2e 0%, #38a169 35%, #38a169 65%, #d69e2e 100%); width: 50%;">Zone optimale &plusmn;2 pts</div>
+    </div>
+    <div class="score-bar">
+      <span style="width:120px; font-size:0.85rem; font-weight:600;">Lissage (15%)</span>
+      <div class="bar" style="background: linear-gradient(90deg, #38a169 0%, #38a169 50%, #e53e3e 100%); width: 50%;">Seuil 5% variation</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Composante</th><th>Score = 1 (optimal)</th><th>Score = 0 (penalise)</th><th>Parametre</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>S_marge</strong></td>
+        <td>MLNI_Taux &ge; 50%</td>
+        <td>MLNI_Taux = 0%</td>
+        <td><code>marge_scale_max_pct: 50</code></td>
+      </tr>
+      <tr>
+        <td><strong>S_indice</strong></td>
+        <td>|indice - cible| &le; 2 pts</td>
+        <td>&gt; 10 pts au-dessus, &gt; 20 pts en dessous</td>
+        <td><code>indice_zone_optimale_pts: 2</code></td>
+      </tr>
+      <tr>
+        <td><strong>S_lissage</strong></td>
+        <td>Variation PVC &le; 5%</td>
+        <td>Variation PVC &gt; 25%</td>
+        <td><code>lissage_seuil_pct: 5</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 Selection du meilleur scenario</h3>
+  <ol style="margin-left: 1.5rem; font-size: 0.9rem;">
+    <li>Filtrer les scenarios <strong>faisables</strong> (MADH &ge; 0 ET MFIL &ge; 0)</li>
+    <li>Parmi les faisables, selectionner celui avec le <strong>score max</strong></li>
+    <li>Si aucun faisable : prendre le meilleur score global (flag <code>Is_Feasible = false</code>)</li>
+  </ol>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 7. CONVERGENCE ITERATIVE                                               -->
+<!-- ====================================================================== -->
+<div class="section" id="convergence">
+  <h2>7. Boucle de Convergence</h2>
+
+  <p>Apres chaque run Monte Carlo, on verifie les metriques <strong>portfolio</strong> (agregees par enseigne) :</p>
+
+  <div class="loop-box">
+    <div class="loop-label">BOUCLE &times; 5 max</div>
+    <div class="flow" style="margin: 0;">
+      <div class="flow-step" style="max-width: 100%;">
+        <div class="step-title">A. Perequation</div>
+        <div class="step-desc">Recalcul MLNI SUIVI prevu (apres MC) &rarr; derive MLNI NS requis</div>
+      </div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-step" style="max-width: 100%;">
+        <div class="step-title">B. Monte Carlo</div>
+        <div class="step-desc">10K scenarios par produit, scoring, selection du meilleur</div>
+      </div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-step" style="max-width: 100%;">
+        <div class="step-title">C. Verification Portfolio</div>
+        <div class="step-desc">
+          Indice CA comparable = &Sigma;(PVC_opt &times; Qte) / &Sigma;(PrixConc &times; Qte) &times; 100<br>
+          MLNI portfolio = &Sigma;(CA_HT_opt - PA &times; Qte) / &Sigma;(CA_TTC_opt) &times; 100
+        </div>
+      </div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-step" style="max-width: 100%;">
+        <div class="step-title">D. Test de Convergence</div>
+        <div class="step-desc">
+          <span class="badge badge-green">CONVERGENT</span> si |MLNI_portfolio - cible| &le; 1 pt ET |Indice_CA - cible| &le; 2 pts<br>
+          <span class="badge badge-orange">NON CONVERGENT</span> &rarr; retour a l'etape A avec bornes ajustees
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Metrique portfolio</th><th>Cible ITM</th><th>Cible NETTO</th><th>Tolerance</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>MLNI Portefeuille</td><td>34.75%</td><td>29.25%</td><td>&plusmn; 1 pt</td></tr>
+      <tr><td>Indice CA comparable</td><td>102</td><td>100</td><td>&plusmn; 2 pts</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 8. TABLES DE SORTIE                                                    -->
+<!-- ====================================================================== -->
+<div class="section" id="sorties">
+  <h2>8. Tables de Sortie (Databricks Delta)</h2>
+
+  <div class="alert alert-info">
+    <strong>PAS DE CSV</strong> &mdash; Toutes les sorties sont des tables Delta en mode <code>append</code>,
+    partitionnees par <code>run_id</code>. Chaque run est archive et auditable.
+    Retention : 52 runs (1 an hebdo). Compression : snappy.
+  </div>
+
+  <h3>8.1 Table <code>pricing.reco_pricing</code> &mdash; Recommandations</h3>
+  <table>
+    <thead>
+      <tr><th>Colonne</th><th>Type</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>CODE_PRODUIT</code></td><td>string</td><td>Code produit standard</td></tr>
+      <tr><td><code>CODBAS</code></td><td>string</td><td>Code base logistique</td></tr>
+      <tr><td><code>Nom_Base</code></td><td>string</td><td>Nom de la base</td></tr>
+      <tr><td><code>Enseigne</code></td><td>string</td><td>INTERMARCHE | NETTO</td></tr>
+      <tr><td><code>PA</code></td><td>float</td><td>Prix d'achat unitaire</td></tr>
+      <tr><td><code>PVC_Current</code></td><td>float</td><td>PVC actuel</td></tr>
+      <tr><td><code>PVC_Optimal</code></td><td>float</td><td>PVC recommande (palier FL X.X9)</td></tr>
+      <tr><td><code>PC_Optimal</code></td><td>float</td><td>Prix de cession recommande</td></tr>
+      <tr><td><code>Delta_PVC</code></td><td>float</td><td>PVC_Optimal - PVC_Current (&euro;)</td></tr>
+      <tr><td><code>Delta_PVC_Pct</code></td><td>float</td><td>Variation en %</td></tr>
+      <tr><td><code>MLNI_Prevu</code></td><td>float</td><td>Taux MLNI prevu (%)</td></tr>
+      <tr><td><code>MADH_Prevu</code></td><td>float</td><td>Taux MADH prevu (%)</td></tr>
+      <tr><td><code>MFIL_Prevu</code></td><td>float</td><td>Taux MFIL prevu (%)</td></tr>
+      <tr><td><code>Indice_Prevu</code></td><td>float</td><td>Indice vs concurrent</td></tr>
+      <tr><td><code>Score</code></td><td>float</td><td>Score multi-criteres [0, 1]</td></tr>
+      <tr><td><code>Is_Feasible</code></td><td>bool</td><td>Toutes contraintes respectees</td></tr>
+      <tr><td><code>N_Feasible</code></td><td>int</td><td>Nb scenarios faisables / 10 000</td></tr>
+      <tr><td><code>run_id</code></td><td>string</td><td>Identifiant du run</td></tr>
+      <tr><td><code>date_run</code></td><td>datetime</td><td>Date/heure d'execution</td></tr>
+      <tr><td><code>mode</code></td><td>string</td><td>friday | tuesday</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Partition :</strong> <code>run_id</code>, <code>date_run</code>, <code>mode</code><br>
+     <strong>Cles :</strong> <code>CODE_PRODUIT</code>, <code>CODBAS</code>, <code>Enseigne</code>, <code>Semaine_FFL</code></p>
+
+  <h3>8.2 Table <code>pricing.polco_pricing</code> &mdash; Prix POLCO</h3>
+  <table>
+    <thead><tr><th>Colonne</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>CODE_PRODUIT_STANDARD</code></td><td>Code produit</td></tr>
+      <tr><td><code>CODBAS</code></td><td>Base logistique</td></tr>
+      <tr><td><code>Enseigne</code></td><td>INTERMARCHE (seule enseigne POLCO)</td></tr>
+      <tr><td><code>Semaine_FFL</code></td><td>Semaine d'application</td></tr>
+      <tr><td><code>pvc_polco</code></td><td>PVC impose</td></tr>
+      <tr><td><code>is_polco</code></td><td>Flag = 1</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 Table <code>pricing.perequation_details</code></h3>
+  <p>Matrice de perequation pivotee, compatible DAX / Power BI.
+     Granularite : <code>Semaine_FFL</code> &times; <code>CODBAS</code> &times; <code>Enseigne</code>.</p>
+  <p>Colonnes : toutes les _SUIVI, _NS, _TOTAL + indicateurs derives (Part_NS, MLNI_NS_Requis, etc.)</p>
+
+  <h3>8.4 Table <code>pricing.synthese_pricing</code></h3>
+  <p>Agregation par <code>CODBAS</code> &times; <code>Enseigne</code> : Nb_Produits, Nb_Feasible, Delta_PVC moyen, MLNI moyen.</p>
+
+  <h3>8.5 Table <code>pricing.decomposition_marge_suivis</code></h3>
+  <p>Decomposition detaillee MADH / MFIL / MLNI par produit, avec les valeurs et taux prevus.</p>
+
+  <h3>8.6 Table <code>pricing.portfolio_metrics</code></h3>
+  <table>
+    <thead><tr><th>Colonne</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>Enseigne</code></td><td>INTERMARCHE | NETTO</td></tr>
+      <tr><td><code>converged</code></td><td>Flag convergence MC</td></tr>
+      <tr><td><code>n_iterations</code></td><td>Nb iterations MC</td></tr>
+      <tr><td><code>MLNI_Portfolio</code></td><td>MLNI global apres optimisation</td></tr>
+      <tr><td><code>Indice_CA</code></td><td>Indice CA comparable</td></tr>
+      <tr><td><code>MLNI_NS_Requis</code></td><td>MLNI NS cible (perequation)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 9. ARBORESCENCE                                                        -->
+<!-- ====================================================================== -->
+<div class="section" id="arborescence">
+  <h2>9. Arborescence du Projet</h2>
+
+  <div class="tree">
+<span class="dir">retail-price-optimization-mlops/</span>
+├── <span class="dir">config/</span>
+│   └── <span class="highlight">business_rules.yaml</span>       <span class="comment"># 443 lignes, 13 sections, TOUTES les regles metier</span>
+│
+├── <span class="dir">src/</span>                              <span class="comment"># 3 067 lignes de code Python</span>
+│   ├── __init__.py
+│   ├── <span class="highlight">config.py</span>                  <span class="comment"># Loader YAML → constantes Python (174 lignes)</span>
+│   │
+│   ├── <span class="dir">features/</span>                  <span class="comment"># Chargement et preparation des donnees</span>
+│   │   ├── historique.py           <span class="comment"># VF financier + calcul 3 marges SCAFLF</span>
+│   │   ├── indices.py              <span class="comment"># Indices CA comparable (formule V5)</span>
+│   │   ├── polco.py                <span class="comment"># Prix contraints POLCO (PRICING_FFL_*.csv)</span>
+│   │   ├── calendrier.py           <span class="comment"># Semaine FFL, feries, saison</span>
+│   │   ├── meteo.py                <span class="comment"># API Open-Meteo, 19 bases GPS</span>
+│   │   └── build_dataset.py        <span class="comment"># Assemblage dataset produit complet</span>
+│   │
+│   ├── <span class="dir">forecast/</span>                  <span class="comment"># Modele de prediction LightGBM</span>
+│   │   ├── train.py                <span class="comment"># Entrainement (53 features, early stopping)</span>
+│   │   ├── predict.py              <span class="comment"># Prediction horizon J+N</span>
+│   │   └── evaluate.py             <span class="comment"># MAPE, MAE, RMSE, eval par base</span>
+│   │
+│   ├── <span class="dir">perequation/</span>               <span class="comment"># Equilibrage marge — AVANT le MC</span>
+│   │   ├── <span class="highlight">matrix.py</span>              <span class="comment"># Matrice SUIVI/NS pivotee (DAX-ready)</span>
+│   │   ├── <span class="highlight">targets.py</span>             <span class="comment"># MLNI NS requis → cible MC</span>
+│   │   └── constraints.py          <span class="comment"># Validation 3 marges, bornes prix, tensions</span>
+│   │
+│   ├── <span class="dir">optimization/</span>              <span class="comment"># Monte Carlo iteratif</span>
+│   │   ├── simulator.py            <span class="comment"># 10K scenarios, paliers FL X.X9</span>
+│   │   ├── scorer.py               <span class="comment"># Marge 50% + Indice 35% + Lissage 15%</span>
+│   │   └── <span class="highlight">optimizer.py</span>           <span class="comment"># Boucle iterative : MC → check → re-iterer</span>
+│   │
+│   ├── <span class="dir">output/</span>
+│   │   └── databricks_writer.py    <span class="comment"># Tables Delta, append, partitionnees par run_id</span>
+│   │
+│   └── <span class="dir">pipeline/</span>
+│       └── <span class="highlight">run_pricing.py</span>         <span class="comment"># Orchestrateur : Forecast → Pereq → MC → Sortie</span>
+│
+├── <span class="dir">tests/</span>                             <span class="comment"># 26 tests unitaires</span>
+│   ├── conftest.py                 <span class="comment"># Fixtures donnees synthetiques</span>
+│   ├── test_config.py              <span class="comment"># 8 tests loader YAML</span>
+│   ├── test_perequation.py         <span class="comment"># 7 tests matrice + cibles + contraintes</span>
+│   └── test_optimization.py        <span class="comment"># 11 tests MC simulator + scorer + optimizer</span>
+│
+├── <span class="dir">notebooks/</span>                         <span class="comment"># Analyses exploratoires</span>
+├── pyproject.toml                  <span class="comment"># Dependencies (pandas, lightgbm, pyyaml...)</span>
+├── .gitignore
+└── README.md
+  </div>
+
+  <h3>9.1 Modules &mdash; Lignes de code</h3>
+  <table>
+    <thead>
+      <tr><th>Module</th><th>Lignes</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/pipeline/run_pricing.py</code></td><td><strong>388</strong></td><td>Orchestrateur principal</td></tr>
+      <tr><td><code>src/optimization/optimizer.py</code></td><td><strong>329</strong></td><td>MC iteratif avec convergence</td></tr>
+      <tr><td><code>src/perequation/targets.py</code></td><td><strong>218</strong></td><td>Cibles MLNI NS</td></tr>
+      <tr><td><code>src/optimization/simulator.py</code></td><td><strong>214</strong></td><td>Generation scenarios FL</td></tr>
+      <tr><td><code>src/config.py</code></td><td><strong>174</strong></td><td>Loader YAML + validation</td></tr>
+      <tr><td><code>src/optimization/scorer.py</code></td><td><strong>170</strong></td><td>Scoring multi-criteres</td></tr>
+      <tr><td><code>src/output/databricks_writer.py</code></td><td><strong>169</strong></td><td>Writer Delta</td></tr>
+      <tr><td><code>src/perequation/constraints.py</code></td><td><strong>162</strong></td><td>Validation marges</td></tr>
+      <tr><td><code>src/perequation/matrix.py</code></td><td><strong>155</strong></td><td>Matrice perequation</td></tr>
+      <tr><td><code>src/forecast/train.py</code></td><td><strong>151</strong></td><td>Entrainement LightGBM</td></tr>
+      <tr><td><code>src/features/polco.py</code></td><td><strong>149</strong></td><td>Chargement POLCO</td></tr>
+      <tr><td><code>src/features/indices.py</code></td><td><strong>147</strong></td><td>Indices concurrents</td></tr>
+      <tr><td>Autres modules</td><td>541</td><td>Features, forecast, etc.</td></tr>
+      <tr style="font-weight:700; background: #edf2f7;">
+        <td>TOTAL</td><td><strong>3 067</strong></td><td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 10. CONFIG YAML                                                        -->
+<!-- ====================================================================== -->
+<div class="section" id="config">
+  <h2>10. Configuration (business_rules.yaml)</h2>
+
+  <p>Toutes les regles metier sont dans un seul fichier YAML. Aucune modification de code necessaire.</p>
+
+  <table>
+    <thead>
+      <tr><th>#</th><th>Section</th><th>Contenu</th><th>Modifiable metier</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td><code>produits</code></td><td>3 populations (SUIVI, NS, POLCO), filtres, politique prix</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>2</td><td><code>enseignes</code></td><td>Objectifs MLNI, indices, concurrents par enseigne</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>3</td><td><code>formules</code></td><td>TVA, seuils aberrances, filiere horticole</td><td><span class="badge badge-orange">attention</span></td></tr>
+      <tr><td>4</td><td><code>perequation</code></td><td>Granularite DAX, colonnes matrice, indicateurs</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>5</td><td><code>monte_carlo</code></td><td>N scenarios, poids scoring, seuils</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>6</td><td><code>contraintes_prix</code></td><td>Bornes PVC/PC, arrondi FL, stabilite</td><td><span class="badge badge-orange">attention</span></td></tr>
+      <tr><td>7</td><td><code>previsions</code></td><td>Parametres LightGBM, mix volume</td><td><span class="badge badge-orange">attention</span></td></tr>
+      <tr><td>8</td><td><code>bases</code></td><td>19 bases logistiques avec GPS</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>9</td><td><code>sortie</code></td><td>6 tables Databricks, schemas, partitions</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>10</td><td><code>scheduling</code></td><td>Vendredi J+7, Mardi J+4</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>11</td><td><code>modes</code></td><td>Complet, simulation, suivis_only</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>12</td><td><code>meteo</code></td><td>API Open-Meteo, variables</td><td><span class="badge badge-green">oui</span></td></tr>
+      <tr><td>13</td><td><code>technique</code></td><td>Log level, format run_id, metadata</td><td><span class="badge badge-green">oui</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 11. BASES LOGISTIQUES                                                  -->
+<!-- ====================================================================== -->
+<div class="section" id="bases">
+  <h2>11. Bases Logistiques (19)</h2>
+
+  <table>
+    <thead>
+      <tr><th>Code</th><th>Nom</th><th>Ville</th><th>Latitude</th><th>Longitude</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>8</td><td>ANGOULEME</td><td>Angouleme</td><td>45.65</td><td>0.16</td></tr>
+      <tr><td>10</td><td>BEZIERS</td><td>Beziers</td><td>43.34</td><td>3.22</td></tr>
+      <tr><td>14</td><td>DOLE</td><td>Dole</td><td>47.09</td><td>5.49</td></tr>
+      <tr><td>20</td><td>AVION</td><td>Avion</td><td>50.41</td><td>2.83</td></tr>
+      <tr><td>26</td><td>LYON</td><td>St-Quentin-Fallavier</td><td>45.63</td><td>5.10</td></tr>
+      <tr><td>28</td><td>NEULLIAC</td><td>Neulliac</td><td>48.13</td><td>-3.02</td></tr>
+      <tr><td>35</td><td>DONZERE</td><td>Donzere</td><td>44.44</td><td>4.71</td></tr>
+      <tr><td>48</td><td>MONTBARTIER</td><td>Montbartier</td><td>44.00</td><td>1.27</td></tr>
+      <tr><td>55</td><td>AMILLY</td><td>Amilly</td><td>47.97</td><td>2.77</td></tr>
+      <tr><td>59</td><td>CANLY</td><td>Canly</td><td>49.37</td><td>2.52</td></tr>
+      <tr><td>65</td><td>MONTELIMAR</td><td>Montelimar</td><td>44.56</td><td>4.75</td></tr>
+      <tr><td>66</td><td>LUXEMONT</td><td>Luxemont-et-Villotte</td><td>48.70</td><td>5.20</td></tr>
+      <tr><td>68</td><td>CASTETS</td><td>Castets</td><td>43.88</td><td>-1.15</td></tr>
+      <tr><td>72</td><td>BRIGNOLES</td><td>Brignoles</td><td>43.41</td><td>6.06</td></tr>
+      <tr><td>78</td><td>LOUVIERS</td><td>Louviers</td><td>49.22</td><td>1.17</td></tr>
+      <tr><td>82</td><td>PARIS/MELUN-SENART</td><td>Melun</td><td>48.54</td><td>2.66</td></tr>
+      <tr><td>85</td><td>HEUDEBOUVILLE</td><td>Heudebouville</td><td>49.16</td><td>1.20</td></tr>
+      <tr><td>88</td><td>BOURGES</td><td>Bourges</td><td>47.08</td><td>2.40</td></tr>
+      <tr><td>97</td><td>ERBREE</td><td>Erbree</td><td>48.10</td><td>-1.20</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================================== -->
+<!-- 12. SCHEDULING                                                         -->
+<!-- ====================================================================== -->
+<div class="section">
+  <h2>12. Scheduling &amp; Modes d'Execution</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Scheduling bi-hebdomadaire</h3>
+      <table>
+        <thead><tr><th>Jour</th><th>Horizon</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Vendredi</strong></td><td>J+7</td><td>Run principal &mdash; indices frais du jeudi</td></tr>
+          <tr><td><strong>Mardi</strong></td><td>J+4</td><td>Reajustement &mdash; actuals weekend + lundi</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Modes d'execution</h3>
+      <table>
+        <thead><tr><th>Mode</th><th>Schema</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><strong>complet</strong></td><td><code>pricing</code></td><td>Tous produits, toutes bases</td></tr>
+          <tr><td><strong>simulation</strong></td><td><code>pricing_sandbox</code></td><td>Dry run (pas de prod)</td></tr>
+          <tr><td><strong>suivis_only</strong></td><td><code>pricing</code></td><td>SUIVIS sans POLCO report</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3>Execution</h3>
+  <div class="code-block">
+<span style="color:#718096"># Run vendredi complet</span>
+python -m src.pipeline.run_pricing friday complet
+
+<span style="color:#718096"># Run mardi reajustement</span>
+python -m src.pipeline.run_pricing tuesday complet
+
+<span style="color:#718096"># Simulation (dry run, schema sandbox)</span>
+python -m src.pipeline.run_pricing friday simulation
+  </div>
+</div>
+
+
+</div><!-- container -->
+
+<div class="footer">
+  <p>Pricing Pipeline SCAFLF F&L &mdash; Documentation technique<br>
+  Genere le 23 fevrier 2026 &mdash; repo <code>retail-price-optimization-mlops</code></p>
+</div>
+
+</body>
+</html>
