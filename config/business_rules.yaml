@@ -1,0 +1,248 @@
+# =============================================================================
+# REGLES METIER — Pricing Retail
+# =============================================================================
+# Ce fichier centralise TOUTES les règles métier pilotables par le métier.
+# Aucune modification de code n'est nécessaire pour ajuster ces paramètres.
+# Historique des modifications : utiliser git blame sur ce fichier.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. TAXONOMIE PRODUITS
+# -----------------------------------------------------------------------------
+produits:
+  # Produits suivis : prix imposés ou négociés, le modèle ne les touche pas
+  suivis:
+    source: "referentiel_produits"          # table Databricks source
+    filtre_colonne: "flag_suivi"            # colonne booléenne dans le référentiel
+    politique_prix: "passthrough"           # le prix est transmis tel quel
+
+  # Produits non suivis : le modèle optimise leur prix
+  non_suivis:
+    politique_prix: "optimisation"
+    # Décomposition de marge globale sur les non suivis
+    decomposition_marge:
+      actif: true
+      source_ventes_futures: "previsions_volume_ca"   # table des prévisions
+      methode: "prorata_ca_previsionnel"               # clé de répartition
+
+
+# -----------------------------------------------------------------------------
+# 2. PEREQUATION
+# -----------------------------------------------------------------------------
+perequation:
+  actif: true
+  description: >
+    Mécanisme d'équilibrage de marge entre bases et enseignes.
+    Objectif : lisser les écarts de rentabilité tout en respectant
+    les contraintes concurrentielles locales.
+
+  # Granularité d'affichage (doit être compatible DAX / Power BI)
+  granularite:
+    dimensions:
+      - base
+      - enseigne
+      - semaine               # ISO week — clé temporelle pour DAX
+    table_databricks: "perequation_details"
+
+  # Paramètres de calcul
+  calcul:
+    cible_marge_globale_pct: null           # null = calculé dynamiquement par run
+    tolerance_ecart_base_pct: 2.0           # écart max toléré entre bases (%)
+    tolerance_ecart_enseigne_pct: 1.5       # écart max toléré entre enseignes (%)
+    ponderation: "volume_ca_previsionnel"   # pondération par volume CA prévisionnel
+
+  # Contraintes
+  contraintes:
+    respecter_prix_plancher: true
+    respecter_prix_plafond: true
+    priorite_sur_marge_cible: false         # si conflit, la péréquation cède
+
+
+# -----------------------------------------------------------------------------
+# 3. PREVISIONS VOLUME / CA
+# -----------------------------------------------------------------------------
+previsions:
+  description: >
+    Données de prévision de volume et CA fournies en amont.
+    Nécessaires à la péréquation et au mix volume potentiel.
+
+  source:
+    table_databricks: "previsions_volume_ca"
+    colonnes_requises:
+      - code_produit
+      - base
+      - enseigne
+      - semaine_iso
+      - volume_prevu
+      - ca_prevu
+
+  # Mix volume potentiel
+  mix_volume:
+    actif: true
+    methode: "contribution_marginale"       # poids de chaque produit dans le mix
+    horizon_semaines: 4                     # horizon glissant de calcul
+
+
+# -----------------------------------------------------------------------------
+# 4. CONTRAINTES DE PRIX
+# -----------------------------------------------------------------------------
+contraintes_prix:
+  # Prix plancher (floor)
+  prix_plancher:
+    actif: true
+    methode: "cout_revient_majore"
+    majoration_pct: 1.0                     # marge mini 1% au-dessus du coût de revient
+
+  # Prix plafond (ceiling)
+  prix_plafond:
+    actif: true
+    methode: "indice_concurrentiel"
+    indice_max: 105                         # indice prix max vs concurrence (base 100)
+
+  # Arrondis
+  arrondis:
+    actif: true
+    methode: "prix_psychologique"           # arrondi au x.x9 / x.x5
+    pas: 0.05                              # pas d'arrondi minimum
+    suffixes_autorises: [5, 9]             # centimes autorisés en suffixe
+
+  # Écart max entre deux runs (anti-volatilité)
+  stabilite:
+    actif: true
+    ecart_max_pct: 5.0                      # variation max entre 2 runs consécutifs
+    ecart_max_absolu: 0.50                  # variation max en € entre 2 runs
+
+
+# -----------------------------------------------------------------------------
+# 5. MARGES & OBJECTIFS
+# -----------------------------------------------------------------------------
+marges:
+  # Objectif de marge globale (tous produits confondus)
+  objectif_global:
+    taux_marge_cible_pct: null              # null = défini par run / scénario
+    mode: "taux_marge_brute"                # taux_marge_brute | taux_marge_nette
+
+  # Décomposition par axe
+  decomposition:
+    axes:
+      - base
+      - enseigne
+      - famille_produit
+    methode: "top_down"                     # top_down | bottom_up
+    source_poids: "ca_previsionnel"         # clé de ventilation
+
+
+# -----------------------------------------------------------------------------
+# 6. SORTIE DATABRICKS
+# -----------------------------------------------------------------------------
+sortie:
+  format: "databricks_table"                # PAS de CSV — tables en dur
+
+  tables:
+    # Table principale des recommandations
+    recommandations:
+      nom: "reco_pricing"
+      schema: "pricing"
+      mode_ecriture: "append"               # append = archivage par run
+      colonnes_partition:
+        - run_id
+        - date_run
+        - mode
+      colonnes_cles:
+        - code_produit
+        - base
+        - enseigne
+        - semaine_iso
+
+    # Table péréquation (détail pour DAX)
+    perequation:
+      nom: "perequation_details"
+      schema: "pricing"
+      mode_ecriture: "append"
+      colonnes_partition:
+        - run_id
+        - date_run
+      colonnes_cles:
+        - base
+        - enseigne
+        - semaine_iso
+
+    # Table synthèse
+    synthese:
+      nom: "synthese_pricing"
+      schema: "pricing"
+      mode_ecriture: "append"
+      colonnes_partition:
+        - run_id
+        - date_run
+        - mode
+
+    # Table décomposition de marge (non suivis)
+    decomposition_marge:
+      nom: "decomposition_marge_non_suivis"
+      schema: "pricing"
+      mode_ecriture: "append"
+      colonnes_partition:
+        - run_id
+        - date_run
+      colonnes_cles:
+        - code_produit
+        - base
+        - enseigne
+        - semaine_iso
+
+  # Archivage
+  archivage:
+    actif: true
+    retention_runs: 52                      # garder 52 derniers runs (1 an hebdo)
+    compression: "snappy"
+
+
+# -----------------------------------------------------------------------------
+# 7. MODES D'EXECUTION
+# -----------------------------------------------------------------------------
+modes:
+  # Mode normal : pricing complet
+  complet:
+    description: "Run complet — tous produits, toutes bases, toutes enseignes"
+    inclure_suivis: true
+    inclure_non_suivis: true
+    perequation: true
+    decomposition_marge: true
+
+  # Mode simulation : pas d'écriture définitive
+  simulation:
+    description: "Dry run — calcul sans écriture en table de prod"
+    schema_sortie: "pricing_sandbox"
+    inclure_suivis: true
+    inclure_non_suivis: true
+    perequation: true
+    decomposition_marge: true
+
+  # Mode non-suivis uniquement
+  non_suivis_only:
+    description: "Optimisation des non-suivis uniquement"
+    inclure_suivis: false
+    inclure_non_suivis: true
+    perequation: true
+    decomposition_marge: true
+
+
+# -----------------------------------------------------------------------------
+# 8. PARAMETRES TECHNIQUES
+# -----------------------------------------------------------------------------
+technique:
+  # Logging
+  log_level: "INFO"
+
+  # Gestion des runs
+  run:
+    id_format: "PRICING_{mode}_{YYYYMMDD}_{HHmmss}"
+    metadata:
+      - utilisateur
+      - mode
+      - date_run
+      - version_config                      # hash du présent fichier
+      - nombre_produits_traites
+      - marge_globale_obtenue
