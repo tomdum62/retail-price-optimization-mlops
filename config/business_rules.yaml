@@ -11,20 +11,20 @@
 # 1. TAXONOMIE PRODUITS
 # -----------------------------------------------------------------------------
 produits:
-  # Produits suivis : prix imposés ou négociés, le modèle ne les touche pas
+  # Produits suivis : optimisés par le modèle (c'est eux qu'on travaille)
   suivis:
     source: "referentiel_produits"          # table Databricks source
     filtre_colonne: "flag_suivi"            # colonne booléenne dans le référentiel
-    politique_prix: "passthrough"           # le prix est transmis tel quel
-
-  # Produits non suivis : le modèle optimise leur prix
-  non_suivis:
-    politique_prix: "optimisation"
-    # Décomposition de marge globale sur les non suivis
+    politique_prix: "optimisation"          # prix optimisé par le modèle
+    # Décomposition de marge globale sur les suivis
     decomposition_marge:
       actif: true
       source_ventes_futures: "previsions_volume_ca"   # table des prévisions
       methode: "prorata_ca_previsionnel"               # clé de répartition
+
+  # Produits non suivis (POLCO) : prix imposés, le modèle ne les touche pas
+  non_suivis:
+    politique_prix: "passthrough"           # prix imposé — transmis tel quel
 
 
 # -----------------------------------------------------------------------------
@@ -178,9 +178,9 @@ sortie:
         - date_run
         - mode
 
-    # Table décomposition de marge (non suivis)
+    # Table décomposition de marge (suivis — produits optimisés)
     decomposition_marge:
-      nom: "decomposition_marge_non_suivis"
+      nom: "decomposition_marge_suivis"
       schema: "pricing"
       mode_ecriture: "append"
       colonnes_partition:
@@ -220,11 +220,11 @@ modes:
     perequation: true
     decomposition_marge: true
 
-  # Mode non-suivis uniquement
-  non_suivis_only:
-    description: "Optimisation des non-suivis uniquement"
-    inclure_suivis: false
-    inclure_non_suivis: true
+  # Mode suivis uniquement (optimisation seule, sans les POLCO)
+  suivis_only:
+    description: "Optimisation des suivis uniquement"
+    inclure_suivis: true
+    inclure_non_suivis: false
     perequation: true
     decomposition_marge: true
 
